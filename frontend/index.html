@@ -1,45 +1,182 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cancer AI Assistant</title>
+    <title>Cancer AI Assistant — Intelligent Healthcare Companion</title>
+    <meta name="description" content="An AI-powered cancer information assistant providing safe, structured, and reliable patient-focused responses using RAG and LLM technology.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
-        <header class="chat-header">
-            <div class="header-info">
-                <h1>🧬 Cancer AI</h1>
-                <p class="subtitle">Secure, RAG-powered healthcare assistant</p>
-            </div>
-            <div class="status-indicator">
-                <span class="dot"></span> Online
-            </div>
-        </header>
+    <!-- Animated background particles -->
+    <canvas id="particles-canvas"></canvas>
 
-        <main class="chat-window" id="chat-window">
-            <div class="message system">
-                <div class="avatar">🧬</div>
-                <div class="message-content">
-                    <p>Hello! I am your Cancer Information Assistant. How can I help you today?</p>
-                    <span class="disclaimer-text">I can provide general information, but I cannot diagnose or prescribe.</span>
+    <div class="app-layout">
+        <!-- ========== SIDEBAR ========== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">🧬</div>
+                    <div class="logo-text">
+                        <span class="logo-title">Cancer AI</span>
+                        <span class="logo-version">v2.0 Pro</span>
+                    </div>
+                </div>
+                <button class="icon-btn" id="sidebar-close-btn" aria-label="Close sidebar">✕</button>
+            </div>
+
+            <button class="new-chat-btn" id="new-chat-btn">
+                <span class="btn-icon">＋</span> New Conversation
+            </button>
+
+            <div class="sidebar-section">
+                <div class="section-title">
+                    <span>💬 Chat History</span>
+                    <button class="icon-btn-sm" id="clear-history-btn" title="Clear all history">🗑️</button>
+                </div>
+                <div class="history-search">
+                    <input type="text" id="history-search-input" placeholder="Search conversations...">
+                </div>
+                <div class="history-list" id="history-list">
+                    <!-- Dynamically populated -->
                 </div>
             </div>
-        </main>
 
-        <div class="input-container">
-            <form id="chat-form">
-                <input type="text" id="user-input" placeholder="Ask about symptoms, treatments, prevention..." autocomplete="off" required>
-                <button type="submit" id="send-btn" aria-label="Send message">
-                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="send-icon"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                </button>
-            </form>
+            <div class="sidebar-section">
+                <div class="section-title"><span>📊 Session Stats</span></div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-queries">0</span>
+                        <span class="stat-label">Queries</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-avg-conf">—</span>
+                        <span class="stat-label">Avg Confidence</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-avg-latency">—</span>
+                        <span class="stat-label">Avg Latency</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="stat-sessions">0</span>
+                        <span class="stat-label">Sessions</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="footer-btn" id="export-btn">📥 Export Chat</button>
+                <button class="footer-btn" id="theme-toggle-btn">🌙 Dark Mode</button>
+            </div>
+        </aside>
+
+        <!-- ========== MAIN CONTENT ========== -->
+        <div class="main-content">
+            <header class="chat-header">
+                <div class="header-left">
+                    <button class="icon-btn" id="sidebar-toggle-btn" aria-label="Toggle sidebar">☰</button>
+                    <div class="header-info">
+                        <h1>Cancer AI Assistant</h1>
+                        <p class="subtitle">RAG + LLM Powered · Safe · Reliable</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="voice-controls">
+                        <button class="control-btn" id="voice-input-btn" title="Voice Input (Speech-to-Text)">
+                            <span class="control-icon">🎤</span>
+                            <span class="control-label">Voice</span>
+                        </button>
+                        <button class="control-btn" id="tts-toggle-btn" title="Toggle Text-to-Speech for responses">
+                            <span class="control-icon">🔊</span>
+                            <span class="control-label">Read</span>
+                        </button>
+                    </div>
+                    <div class="status-indicator" id="status-indicator">
+                        <span class="dot"></span>
+                        <span class="status-text">Online</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Quick Suggestions (shown when chat is mostly empty) -->
+            <div class="suggestions-overlay" id="suggestions-overlay">
+                <div class="suggestions-hero">
+                    <div class="hero-icon">🧬</div>
+                    <h2>What would you like to know?</h2>
+                    <p>Ask me anything about cancer awareness, symptoms, prevention, or treatments.</p>
+                </div>
+                <div class="suggestion-chips">
+                    <button class="chip" data-query="What are the early symptoms of lung cancer?">🫁 Lung Cancer Symptoms</button>
+                    <button class="chip" data-query="How can cancer be prevented?">🛡️ Cancer Prevention</button>
+                    <button class="chip" data-query="What is chemotherapy and how does it work?">💊 Chemotherapy Overview</button>
+                    <button class="chip" data-query="What are the risk factors for cancer?">⚠️ Risk Factors</button>
+                    <button class="chip" data-query="What are the side effects of radiation therapy?">☢️ Radiation Side Effects</button>
+                    <button class="chip" data-query="What is palliative care in cancer?">🤝 Palliative Care</button>
+                </div>
+            </div>
+
+            <main class="chat-window" id="chat-window">
+                <div class="message system fade-in">
+                    <div class="avatar bot-avatar">🧬</div>
+                    <div class="message-bubble">
+                        <div class="message-text">
+                            <p>Hello! I'm your <strong>Cancer Information Assistant</strong>. I can help you understand symptoms, treatments, prevention methods, and more.</p>
+                            <p>Choose a topic below or type your question.</p>
+                        </div>
+                        <span class="disclaimer-badge">ℹ️ For informational purposes only. Always consult a doctor.</span>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Voice Recording Indicator -->
+            <div class="voice-recording-bar" id="voice-recording-bar">
+                <div class="recording-pulse"></div>
+                <span>Listening... Speak now</span>
+                <button class="icon-btn" id="stop-recording-btn">⏹️ Stop</button>
+            </div>
+
+            <!-- Image Preview (shown when user attaches an image) -->
+            <div class="image-preview-container" id="image-preview-container">
+                <div class="image-preview-wrapper">
+                    <img id="image-preview-img" src="" alt="Preview">
+                    <button class="image-preview-remove" id="image-preview-remove">✕</button>
+                </div>
+                <div class="image-preview-label">📎 Image attached (visual context only)</div>
+            </div>
+
+            <div class="input-container">
+                <form id="chat-form">
+                    <div class="input-wrapper">
+                        <button type="button" class="input-action-btn" id="image-upload-btn" title="Attach image">🖼️</button>
+                        <button type="button" class="input-action-btn" id="voice-mic-btn" title="Voice input">🎤</button>
+                        <textarea id="user-input" placeholder="Ask about symptoms, treatments, prevention..." rows="1" required></textarea>
+                        <button type="submit" id="send-btn" aria-label="Send message">
+                            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </div>
+                    <div class="input-footer">
+                        <span class="char-count" id="char-count">0 / 500</span>
+                        <span class="powered-by">Powered by Groq · Llama 3</span>
+                    </div>
+                </form>
+                <input type="file" accept="image/*" class="hidden-file-input" id="image-file-input">
+            </div>
         </div>
     </div>
+
+    <!-- Image Lightbox -->
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" id="lightbox-close">✕</button>
+        <img id="lightbox-img" src="" alt="Full size">
+    </div>
+
+    <!-- Toast notification container -->
+    <div class="toast-container" id="toast-container"></div>
+
     <script src="script.js"></script>
 </body>
 </html>
+
