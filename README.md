@@ -1,156 +1,112 @@
-# 🧬 Cancer AI Assistant (RAG + LLM)
+# 🧬 Cancer AI Assistant 2.0 (RAG + LLM + Advanced UI)
 
-An AI-powered cancer information assistant built using **Retrieval-Augmented Generation (RAG)** and **LLM (Groq - Llama 3)** to provide safe, structured, and reliable patient-focused responses.
+An intelligent, AI-powered cancer information companion built using **Retrieval-Augmented Generation (RAG)** and **Groq (Llama 3)**. The project features a robust FastAPI backend combined with a state-of-the-art, glassmorphism-styled frontend offering rich accessibility and media features.
 
----
-
-## 🚀 Features
-
-* 🔍 **RAG-based Retrieval**
-
-  * TF-IDF + cosine similarity
-  * Context-aware responses
-
-* 🧠 **LLM Integration**
-
-  * Powered by Groq (Llama 3)
-  * Fast and high-quality inference
-
-* 🛡️ **Safety Layer**
-
-  * Detects unsafe medical queries
-  * Prevents diagnosis or prescriptions
-
-* 📦 **Structured API**
-
-  * Built with FastAPI
-  * Clean JSON responses
-
-* 📊 **Logging + Debugging**
-
-  * Query + sources + response tracking
+![Cancer AI Assistant](frontend/images/general.png)
 
 ---
 
-## 🧠 Architecture
+## 🌐 Live Demo
 
-User Query → Safety Check → RAG Retrieval → Re-ranking → Prompt Building → LLM (Groq) → Response
+- **Frontend (Web App):** [https://frontend-iota-woad-64.vercel.app](https://frontend-iota-woad-64.vercel.app)
+- **Backend API:** [https://cancer-awareness-and-healthcare-chatbot-b7za.onrender.com/docs](https://cancer-awareness-and-healthcare-chatbot-b7za.onrender.com/docs)
+
+---
+
+## 🚀 Key Features
+
+### 💻 Frontend (Top 1% UI/UX Experience)
+- **Voice Capabilities:** Built-in Speech-to-Text (🎤) for asking questions and Text-to-Speech (🔊) auto-read for answers.
+- **Smart Topic Illustrations:** Automatically detects the medical topic (Lung, Breast, Chemo, Radiation, etc.) from context and displays a beautiful infographic.
+- **Image Uploads & Lightbox:** Attach visual context to queries and view images in a full-screen, zoomable lightbox modal.
+- **Session Management:** Stores chat history persistently in the browser (`localStorage`). Start new chats, search history, or clear logs.
+- **Export Chat:** Download your conversation history as a formatted `.txt` file.
+- **Stunning UI:** Features a dynamic particle background, dark/light theme toggles, smooth micro-animations, glassmorphism panels, and responsive mobile design.
+- **Real-time Analytics:** Tracks session metrics including average confidence and response latency.
+
+### ⚙️ Backend (RAG Pipeline)
+- **RAG-based Retrieval:** Uses TF-IDF + cosine similarity to fetch the most relevant medical context from a curated dataset.
+- **Groq LLM Integration:** Powered by Llama-3-70b for extremely fast and high-quality inference.
+- **Safety First Guardrails:** A heuristic safety layer intercepts queries attempting to seek direct diagnosis or prescriptions, gracefully redirecting users to medical professionals.
+- **Structured API:** Built on FastAPI for high performance and clean JSON responses with latency/confidence metrics.
+- **CORS Enabled:** Fully configured to accept cross-origin requests from the deployed frontend.
 
 ---
 
 ## 📂 Project Structure
 
-```
-app/
-  main.py        # FastAPI app
-  rag.py         # Retrieval system
-  model.py       # Groq LLM integration
-  prompts.py     # Prompt engineering
-  safety.py      # Safety guardrails
-
-data/
-  cancer_data.json
-
-requirements.txt
-README.md
+```text
+cancer-ai-assistant/
+├── app/
+│   ├── main.py        # FastAPI app & CORS setup
+│   ├── rag.py         # TF-IDF Retrieval system
+│   ├── model.py       # Groq LLM integration & fallback handling
+│   ├── prompts.py     # Prompt engineering
+│   └── safety.py      # Medical safety guardrails
+│
+├── data/
+│   └── cancer_data.json # RAG Knowledge Base
+│
+├── frontend/
+│   ├── index.html     # Semantic HTML layout
+│   ├── style.css      # Custom CSS, Glassmorphism, Animations
+│   ├── script.js      # API integration, Voice, LocalStorage logic
+│   └── images/        # Topic-specific medical illustrations
+│
+├── requirements.txt   # Python dependencies
+└── README.md          # Project documentation
 ```
 
 ---
 
-## ⚙️ Setup Instructions
+## ⚙️ Local Development Setup
 
-### 1️⃣ Clone repo
-
-```
+### 1️⃣ Clone the Repository
+```bash
 git clone <your-repo-link>
 cd cancer-ai-assistant
 ```
 
----
-
-### 2️⃣ Install dependencies
-
-```
+### 2️⃣ Backend Setup
+```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
----
-
-### 3️⃣ Set environment variable
-
-```
-GROQ_API_KEY=your_api_key_here
-```
-
-(Windows PowerShell)
-
-```
+# Set your Groq API Key (Windows PowerShell)
 setx GROQ_API_KEY "your_api_key_here"
-```
 
----
-
-### 4️⃣ Run the server
-
-```
+# Run the FastAPI server
 uvicorn app.main:app --reload
 ```
+The backend will run at `http://127.0.0.1:8000`. API docs are available at `http://127.0.0.1:8000/docs`.
 
----
-
-### 5️⃣ Open API docs
-
-```
-http://127.0.0.1:8000/docs
-```
-
----
-
-## 🧪 Example Query
-
-```
-{
-  "query": "What are symptoms of lung cancer?"
-}
-```
+### 3️⃣ Frontend Setup
+1. Open the `frontend/script.js` file.
+2. For local testing, ensure the `API_URL` points to your local server:
+   ```javascript
+   const API_URL = "http://127.0.0.1:8000/ask";
+   ```
+3. Open `frontend/index.html` in your browser (preferably using an extension like VS Code Live Server).
 
 ---
 
 ## ⚠️ Disclaimer
 
 This system is for **educational and informational purposes only**.
-It does **not provide medical diagnosis or treatment advice**.
-Always consult a qualified healthcare professional.
+It does **not provide medical diagnosis, prescriptions, or treatment advice**.
+Always consult a qualified healthcare professional or oncologist for medical decisions.
 
 ---
 
 ## 🔥 Tech Stack
 
-* FastAPI
-* Scikit-learn (TF-IDF)
-* Groq API (Llama 3)
-* Python
-
----
-
-## 🎯 Key Highlights
-
-* End-to-end AI system (RAG + LLM)
-* Safety-aware healthcare chatbot
-* Production-ready API design
-* Deployable architecture
-
----
-
-## 🚀 Future Improvements
-
-* Better embeddings (BGE / OpenAI)
-* UI (Streamlit / React)
-* Logging + monitoring
-* Fine-tuning (LoRA)
+- **Frontend:** Vanilla HTML5, CSS3 (Custom Properties, Glassmorphism, CSS Animations), Vanilla JavaScript (Web Speech API, DOM manipulation).
+- **Backend:** FastAPI, Python, Scikit-learn (TF-IDF).
+- **AI/LLM:** Groq API (Llama 3).
+- **Deployment:** Vercel (Frontend), Render (Backend).
 
 ---
 
 ## 👨‍💻 Author
 
-Built as an AI/ML production-level project.
+Built as an AI/ML production-level project with a premium top-tier web interface.
