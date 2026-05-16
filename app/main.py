@@ -8,10 +8,21 @@ from app.prompts import build_prompt
 from app.model import generate
 from app.safety import is_risky, safe_response
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # 🔹 Setup logging
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
+
+# 🔹 Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 # 🔹 Request schema
