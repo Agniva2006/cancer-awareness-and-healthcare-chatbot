@@ -1,0 +1,66 @@
+Agniva Ghosh
+agnivaghosh2006@gmail.com — +91-9641894056 — GitHub
+Education
+Bachelor of Technology in Computer Science 2024 – 2028
+Jalpaiguri Government Engineering College, India
+Skills
+Languages/Data:Python, C++, SQL, JavaScript, Dart, Pandas, NumPy, Exploratory Data Analysis, Matplotlib
+ML & Deep Learning:Scikit-learn, XGBoost, PyTorch, CNNs, LSTMs, Transformers, GNNs, Diffusion, MediaPipe, LoRA
+Backend & Deployment:FastAPI, Node.js, Express.js, REST APIs, Git, Vercel, Render
+Core CS:Data Structures & Algorithms, OOP, Computer Architecture, Digital Electronics, IoT Architecture
+Experience
+Research Internship (IIT Kharagpur) June 2026 – Present
+•Developed ”LabSync”,an end-to-end IoT laboratory access control and dual-biometric management system using a Node.js Express
+backend and a cross-platform Flutter dashboard.
+•Architected a dual-auth biometric enginecombining optical fingerprint scanning (ESP32 via UART) with facial recognition
+(@vladmandic/face-api, MobileNet v1), achieving sub-50ms inference.
+•Built a scalable, zero-cost persistent storage layerusing the Google Sheets API for real-time telemetry, access logging, and
+inventory tracking.
+•Engineered C++ microcontroller firmwarefor ESP32 and ESP32-CAM to handle hardware triggers, HTTP polling loops, and
+live VGA (640x480) camera streaming.
+Freelance Machine Learning Engineer 2024 – Present
+•Developed an automated Gmail spam filtering and auto-response system for a dairy farm business, processing and storing 100,000+
+customer orders in a structured database.
+•Built data pipelines for email classification, automated replies, and order data storage, improving operational efficiency and response
+time.
+•Performed detailed exploratory data analysis on vehicle datasets, including data cleaning, feature engineering, and visualization to
+extract business insights.
+•Created analytical reports and dashboards to identify trends, anomalies, and performance metrics from large datasets.
+Projects
+Telecom Customer Churn & Revenue IntelligencePython, XGBoost, Scikit-learn, FastAPI
+•Architected an enterprise-grade scikit-learn pipeline for leak-free data cleaning, categorical preprocessing, and churn prediction using a
+calibratedXGBoost Classifier.
+•IntegratedTreeSHAPto extract top predictive drivers per customer and developed a CLV Action Matrix to dynamically assign
+personalized retention strategies.
+•Implemented real-time data drift monitoring computing Population Stability Index (PSI) and Kolmogorov-Smirnov (KS) statistics
+against baseline distributions.
+•Exposed machine learning inference and drift evaluation endpoints via a robustFastAPIservice and a Streamlit dashboard.
+OncoGraph AI — Clinical Oncology Decision Support WorkspaceFastAPI, Scikit-learn, NetworkX, NumPy
+•Engineered a relational Knowledge Graph using NetworkX mapping 50+ biomarker/toxicity
+nodes, guaranteeing 100% NCCN/WHO clinical guideline compliance.
+•Designed a collaborative Multi-Agent Swarm orchestrator to simulate multidisciplinary
+tumor board consensus and active clinical trial matching.
+•Implemented prognosis staging prediction via Random Forest models with local Gini
+importances, DICOM/pathology image routing, and FedAvg federated learning.
+Sign0 — AI Sign Language Recognition & SynthesizerPyTorch, ONNX, FastAPI, MediaPipe, DDPM Diffusion
+•Engineered a real-time Spatial-Temporal Transformer and ONNX MLP pipeline for ASL gesture recognition via webcam, achieving0.81
+ms latencyand100% validation accuracy.
+•Built a Denoising Diffusion Probabilistic Model (DDPM) text-to-sign synthesizer to generate 3D skeleton gesture animations from text
+prompts.
+•Developed a fully accessible, glassmorphism-styled web platform with an interactive ASL visual dictionary and TTS audio engine.
+•Deployed backend models via Render and frontend on Vercel, integrating seamless fallback APIs for continuous availability.
+RL Train Football Engine — Multi-Agent Deep RL SimulationPyTorch, Pygame, GNNs, PPO, GANs
+•Developed a 100% autonomous 11v11 football simulation leveraging Multi-Head Graph Attention Networks (GAT) to dynamically
+compute spatial passing channels and defender pressure.
+•Trained 22 independent agents using aProximal Policy Optimization (PPO)Actor-Critic neural policy integrated with Generalized
+Advantage Estimation (GAE).
+•Implemented a 1D ConvolutionalGAN Trajectory Discriminatorto evaluate physical momentum, heavily penalizing robotic jitter
+and rewarding fluid, human-like motion.
+•Built a 3D aerodynamic physics engine integrating Magnus spin curving, elevation bounds, and collision damping.
+Achievements
+•Published a research paper in the Regional Science and Technology Congress (2026) on ”Solving First-Order Differential Equations using
+Physics-Informed Neural Networks”.
+•Built 15+ machine learning projects across NLP, Computer Vision, Multimodal AI, and Time Series.
+•Solved 300+ Data Structures and Competitive Programming problems on LeetCode, Codeforces, and Striver SDE Sheet.
+•Won prizes in 3 Hackathons, including Google Cloud Hackathons, developing end-to-end AI solutions.
+1
