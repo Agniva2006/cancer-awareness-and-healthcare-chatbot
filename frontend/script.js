@@ -54,6 +54,7 @@ let activePanel = 'chat-panel';
 function init() {
     loadSessions();
     loadTheme();
+    setupAuth();
     startNewSession();
     setupParticles();
     setupTextareaAutoResize();
@@ -61,6 +62,7 @@ function init() {
     setupGraphPanel();
     setupTumorBoardPanel();
     setupFederatedPanel();
+    setupMLPanel();
     updateStats();
     loadGraphStats();
 }
@@ -1159,6 +1161,209 @@ function renderFederatedResults(data) {
     });
 
     html += `<div class="privacy-badge">&#x1F512; ${escapeHtml(data.privacy_guarantee || 'No patient data was exchanged between hospital nodes.')}</div>`;
+
+    container.innerHTML = html;
+}
+
+
+}
+
+
+// =============================================
+// USER AUTHENTICATION SYSTEM
+// =============================================
+function setupAuth() {
+    const authOverlay = document.getElementById('auth-overlay');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const goToRegister = document.getElementById('go-to-register');
+    const goToLogin = document.getElementById('go-to-login');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    // Check login state
+    const token = localStorage.getItem('cancerAI_token');
+    const userJson = localStorage.getItem('cancerAI_user');
+    if (token && userJson) {
+        authOverlay.classList.remove('active');
+        const user = JSON.parse(userJson);
+        showToast(`Authenticated as ${user.username}`, 'success');
+    } else {
+        authOverlay.classList.add('active');
+    }
+
+    // Toggle forms
+    goToRegister.addEventListener('click', (e) => {
+        e.preventDefault();
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+    });
+    goToLogin.addEventListener('click', (e) => {
+        e.preventDefault();
+        registerForm.style.display = 'none';
+        loginForm.style.display = 'block';
+    });
+
+    // Login submit
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        try {
+            const resp = await fetch(API_URL + '/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                localStorage.setItem('cancerAI_token', data.token);
+                localStorage.setItem('cancerAI_user', JSON.stringify(data.user));
+                authOverlay.classList.remove('active');
+                showToast(data.message, 'success');
+                loadGraphStats(); // load graph after login
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast('Authentication connection failed.', 'error');
+        }
+    });
+
+    // Register submit
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('reg-username').value.trim();
+        const email = document.getElementById('reg-email').value.trim();
+        const password = document.getElementById('reg-password').value;
+
+        try {
+            const resp = await fetch(API_URL + '/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast(data.message + ' Please sign in.', 'success');
+                registerForm.style.display = 'none';
+                loginForm.style.display = 'block';
+            } else {
+                showToast(data.message, 'error');
+            }
+        } catch (err) {
+            showToast('Registration connection failed.', 'error');
+        }
+    });
+
+    // Logout click
+    logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to log out from this clinical node?')) {
+            localStorage.removeItem('cancerAI_token');
+            localStorage.removeItem('cancerAI_user');
+            authOverlay.classList.add('active');
+            // reset forms
+            document.getElementById('login-username').value = '';
+            document.getElementById('login-password').value = '';
+            registerForm.style.display = 'none';
+            loginForm.style.display = 'block';
+            showToast('Logged out successfully', 'info');
+        }
+    });
+}
+
+
+// =============================================
+// CLINICAL ML PROGNOSIS EXPLORER
+// =============================================
+function setupMLPanel() {
+    const predictBtn = document.getElementById('ml-predict-btn');
+    predictBtn.addEventListener('click', runMLPrediction);
+}
+
+async function runMLPrediction() {
+    const predictBtn = document.getElementById('ml-predict-btn');
+    predictBtn.disabled = true;
+    predictBtn.textContent = 'Running ML inference...';
+
+    const age = parseInt(document.getElementById('ml-age').value) || 55;
+    const tumorSize = parseFloat(document.getElementById('ml-tumor-size').value) || 3.5;
+    const lymphNodes = parseInt(document.getElementById('ml-lymph-nodes').value) || 0;
+    const biomarkerId = document.getElementById('ml-biomarker').value;
+    const symptomCount = parseInt(document.getElementById('ml-symptom-count').value) || 2;
+
+    try {
+        const resp = await fetch(API_URL + '/diagnostics/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                age,
+                tumor_size: tumorSize,
+                lymph_nodes: lymphNodes,
+                biomarker_id: biomarkerId,
+                symptom_count: symptomCount
+            })
+        });
+        const data = await resp.json();
+        if (data.success && data.results) {
+            renderMLResults(data.results);
+        } else {
+            showToast(data.message || 'ML Prediction failed', 'error');
+        }
+    } catch (e) {
+        document.getElementById('ml-results').innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Failed to run ML prediction. Check API connection.</p></div>`;
+    } finally {
+        predictBtn.disabled = false;
+        predictBtn.innerHTML = '&#x1F5A5;&#xFE0F; Run Prognosis Prediction';
+    }
+}
+
+function renderMLResults(res) {
+    const container = document.getElementById('ml-results');
+    
+    let html = `
+        <div class="ml-results-grid">
+            <!-- Staging Risk Probability -->
+            <div class="ml-card-result">
+                <h3>&#x1F4CA; Random Forest Malignancy Probability</h3>
+                
+                <div class="ml-prob-bar">
+                    <div class="ml-prob-row"><span>Low Risk / Benign</span><strong>${res.probabilities.low.toFixed(1)}%</strong></div>
+                    <div class="ml-prob-track"><div class="ml-prob-fill low" style="width: ${res.probabilities.low}%"></div></div>
+                </div>
+
+                <div class="ml-prob-bar">
+                    <div class="ml-prob-row"><span>Moderate Risk / Localized</span><strong>${res.probabilities.moderate.toFixed(1)}%</strong></div>
+                    <div class="ml-prob-track"><div class="ml-prob-fill moderate" style="width: ${res.probabilities.moderate}%"></div></div>
+                </div>
+
+                <div class="ml-prob-bar">
+                    <div class="ml-prob-row"><span>High Risk / Metastatic</span><strong>${res.probabilities.high.toFixed(1)}%</strong></div>
+                    <div class="ml-prob-track"><div class="ml-prob-fill high" style="width: ${res.probabilities.high}%"></div></div>
+                </div>
+
+                <div class="consensus-recommendation" style="margin-top:16px; border-left: 4px solid var(--${res.color_theme}); padding: 8px 12px; background: rgba(255,255,255,0.02);">
+                    <strong>Risk Classification:</strong> <span style="text-transform: uppercase; font-weight:700; color: var(--${res.color_theme})">${res.prediction_label}</span><br>
+                    <p style="font-size:0.8rem; margin-top:4px; line-height:1.4;">${escapeHtml(res.clinical_notes)}</p>
+                </div>
+            </div>
+
+            <!-- Feature Importance -->
+            <div class="ml-card-result">
+                <h3>&#x1F525; Local Gini Feature Importance</h3>
+                
+                ${Object.entries(res.feature_importance).map(([feature, val]) => `
+                    <div class="ml-fi-item">
+                        <div class="ml-fi-label">${escapeHtml(feature)}</div>
+                        <div class="ml-fi-bar-container">
+                            <div class="ml-fi-bar"><div class="ml-fi-fill" style="width: ${val}%"></div></div>
+                            <span class="ml-fi-value">${val.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
 
     container.innerHTML = html;
 }

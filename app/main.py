@@ -14,9 +14,13 @@ from app.vision import analyze_medical_image
 from app.graph_engine import knowledge_graph
 from app.agents.tumor_board import TumorBoardOrchestrator
 from app.dicom_engine import imaging_engine
+from app.ml_predictor import ml_predictor
 from federated.hospital_node import federated_server
 
 from fastapi.middleware.cors import CORSMiddleware
+import hashlib
+import json
+from pathlib import Path
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +35,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# User Database Setup (Local JSON file)
+USER_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "users_db.json"
+USER_DB_PATH.parent.mkdir(exist_ok=True)
+if not USER_DB_PATH.exists():
+    with open(USER_DB_PATH, "w") as f:
+        json.dump({}, f)
+
+def load_users() -> dict:
+    try:
+        with open(USER_DB_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_users(users: dict):
+    with open(USER_DB_PATH, "w") as f:
+        json.dump(users, f, indent=2)
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
 
 # Mount static frontend
 try:
@@ -73,6 +98,20 @@ class ImagingRequest(BaseModel):
     clinical_context: Optional[str] = ""
 
 
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+    email: Optional[str] = ""
+
+
+class PredictionRequest(BaseModel):
+    age: int
+    tumor_size: float
+    lymph_nodes: int
+    biomarker_id: str
+    symptom_count: int
+
+
 STOPWORDS = {"is", "in", "of", "and", "a", "an", "the", "what", "how", "are", "can", "to", "for", "with", "on", "by", "or", "which"}
 
 
@@ -81,7 +120,7 @@ def home():
     return {
         "message": "OncoGraph AI v4.0 -- Enterprise Clinical Cancer Intelligence Platform",
         "version": "4.0.0",
-        "modules": ["chatbot", "graph-rag", "tumor-board", "federated-learning", "dicom-imaging"],
+        "modules": ["chatbot", "graph-rag", "tumor-board", "federated-learning", "dicom-imaging", "ml-diagnostics"],
         "modes": ["patient", "clinical"],
         "triage_active": True
     }
@@ -90,6 +129,64 @@ def home():
 @app.get("/health")
 def health():
     return {"status": "healthy", "timestamp": time.time(), "version": "4.0.0"}
+
+
+# ========== USER AUTHENTICATION ENDPOINTS ==========
+
+@app.post("/auth/register")
+def register(request: AuthRequest):
+    users = load_users()
+    username = request.username.strip()
+    if not username or not request.password:
+        return {"success": False, "message": "Username and password are required."}
+    
+    if username in users:
+        return {"success": False, "message": "Username already exists."}
+    
+    users[username] = {
+        "password": hash_password(request.password),
+        "email": request.email,
+        "created_at": time.time()
+    }
+    save_users(users)
+    return {"success": True, "message": "User registered successfully."}
+
+
+@app.post("/auth/login")
+def login(request: AuthRequest):
+    users = load_users()
+    username = request.username.strip()
+    if username not in users:
+        return {"success": False, "message": "Invalid username or password."}
+    
+    hashed = hash_password(request.password)
+    if users[username]["password"] != hashed:
+        return {"success": False, "message": "Invalid username or password."}
+        
+    return {
+        "success": True, 
+        "message": "Login successful.", 
+        "token": f"session_{username}_{int(time.time())}",
+        "user": {"username": username, "email": users[username].get("email", "")}
+    }
+
+
+# ========== CLINICAL MACHINE LEARNING PREDICTOR ==========
+
+@app.post("/diagnostics/predict")
+def predict_prognosis(request: PredictionRequest):
+    try:
+        prediction = ml_predictor.predict_risk(
+            age=request.age,
+            tumor_size=request.tumor_size,
+            lymph_nodes=request.lymph_nodes,
+            biomarker_id=request.biomarker_id,
+            symptom_count=request.symptom_count
+        )
+        return {"success": True, "results": prediction}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
 
 
 # ========== CORE CHATBOT ENDPOINT ==========

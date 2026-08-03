@@ -144,6 +144,28 @@ test("Safety: blocks diagnosis request", lambda: is_risky("Diagnose me I have a 
 test("Safety: allows educational query", lambda: is_risky("What are breast cancer symptoms?") == False)
 
 
+# ========== NEW: Auth & ML Predictor ==========
+print("\n--- Phase 6: Auth & ML Predictor ---")
+
+from app.ml_predictor import ml_predictor
+from app.main import register, login, AuthRequest, PredictionRequest
+
+# Test ML Predictor
+ml_res = ml_predictor.predict_risk(age=65, tumor_size=4.2, lymph_nodes=1, biomarker_id="EGFR_EX19DEL", symptom_count=3)
+test("ML Predictor output risk classification", lambda: "prediction_label" in ml_res)
+test("ML Predictor has low/mod/high probabilities", lambda: "low" in ml_res["probabilities"] and "high" in ml_res["probabilities"])
+test("ML Predictor has feature importances", lambda: len(ml_res["feature_importance"]) == 5)
+
+# Test Auth local endpoints (fast api directly)
+reg_req = AuthRequest(username="test_oncologist", password="securepassword123", email="test@oncology.org")
+reg_res = register(reg_req)
+test("User registration status", lambda: reg_res["success"] == True or reg_res["message"] == "Username already exists.")
+
+login_req = AuthRequest(username="test_oncologist", password="securepassword123")
+login_res = login(login_req)
+test("User login authorization token", lambda: login_res["success"] == True and "token" in login_res)
+
+
 # ========== SUMMARY ==========
 print("\n" + "=" * 60)
 print(f"RESULTS: {passed}/{total} passed, {failed} failed")

@@ -46,6 +46,10 @@
                     <span class="nav-tab-icon">&#x1F3E5;</span>
                     <span>Federated</span>
                 </button>
+                <button class="nav-tab" data-panel="ml-panel" id="tab-ml">
+                    <span class="nav-tab-icon">&#x1F5A5;&#xFE0F;</span>
+                    <span>ML Prognosis</span>
+                </button>
             </div>
 
             <button class="new-chat-btn" id="new-chat-btn">
@@ -90,6 +94,7 @@
             <div class="sidebar-footer">
                 <button class="footer-btn" id="export-btn">&#x1F4E5; Export Chat</button>
                 <button class="footer-btn" id="theme-toggle-btn">&#x1F319; Dark Mode</button>
+                <button class="footer-btn" id="logout-btn" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.25);color:var(--danger)">&#x1F6AA; Logout</button>
             </div>
         </aside>
 
@@ -328,6 +333,67 @@
                 </div>
             </div>
 
+            <!-- ============ ML PROGNOSIS PANEL ============ -->
+            <div class="panel" id="ml-panel">
+                <div class="dashboard-container">
+                    <div class="dashboard-header">
+                        <h2>&#x1F5A5;&#xFE0F; Clinical ML Staging &amp; Prognosis Predictor</h2>
+                        <p class="dashboard-subtitle">Local Random Forest Classifier predicts cancer malignancy risk (Low vs Moderate vs High) based on clinical biomarkers</p>
+                    </div>
+
+                    <div class="ml-form-grid">
+                        <div class="tumor-board-form" style="margin-bottom: 20px;">
+                            <div class="tb-row">
+                                <div class="tb-field">
+                                    <label>Patient Age (Years)</label>
+                                    <input type="number" id="ml-age" value="55" min="1" max="120">
+                                </div>
+                                <div class="tb-field">
+                                    <label>Tumor Size (cm)</label>
+                                    <input type="number" id="ml-tumor-size" value="3.5" min="0.1" max="30.0" step="0.1">
+                                </div>
+                            </div>
+                            <div class="tb-row">
+                                <div class="tb-field">
+                                    <label>Regional Lymph Nodes involved</label>
+                                    <select id="ml-lymph-nodes">
+                                        <option value="0">Negative (N0 / No regional spread)</option>
+                                        <option value="1">Positive (N1+ / Regional spread present)</option>
+                                    </select>
+                                </div>
+                                <div class="tb-field">
+                                    <label>Actionable Biomarker Profile</label>
+                                    <select id="ml-biomarker">
+                                        <option value="NONE">None identified</option>
+                                        <option value="EGFR_EX19DEL">EGFR Exon 19 Deletion</option>
+                                        <option value="EGFR_L858R">EGFR L858R Point Mutation</option>
+                                        <option value="HER2_AMP">HER2 Amplification</option>
+                                        <option value="ALK_FUSION">ALK-EML4 Gene Rearrangement</option>
+                                        <option value="MSI_H">MSI-High / dMMR</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="tb-row">
+                                <div class="tb-field">
+                                    <label>Total Presenting Symptoms Count</label>
+                                    <input type="number" id="ml-symptom-count" value="2" min="0" max="10">
+                                </div>
+                                <div class="tb-field" style="flex:none; justify-content: flex-end;">
+                                    <button class="tb-run-btn" id="ml-predict-btn" style="background: linear-gradient(135deg, var(--primary), var(--accent));">&#x1F5A5;&#xFE0F; Run Prognosis Prediction</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ml-results" id="ml-results">
+                        <div class="empty-state">
+                            <span class="empty-icon">&#x1F5A5;&#xFE0F;</span>
+                            <p>Submit patient clinical parameters to run the Random Forest prognosis model</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Voice Recording Indicator -->
             <div class="voice-recording-bar" id="voice-recording-bar">
                 <div class="recording-pulse"></div>
@@ -368,6 +434,49 @@
     <div class="lightbox" id="lightbox">
         <button class="lightbox-close" id="lightbox-close">&#x2715;</button>
         <img id="lightbox-img" src="" alt="Full size">
+    </div>
+
+    <!-- User Authentication Modal -->
+    <div class="auth-overlay active" id="auth-overlay">
+        <div class="auth-container">
+            <div class="auth-header">
+                <span class="auth-logo">&#x1F9EC;</span>
+                <h2>OncoGraph AI</h2>
+                <p>Enterprise Clinical Workspace Sign-in</p>
+            </div>
+            
+            <!-- Login Form -->
+            <form id="login-form">
+                <div class="auth-field">
+                    <label>Username</label>
+                    <input type="text" id="login-username" required placeholder="e.g. oncologist_alpha">
+                </div>
+                <div class="auth-field">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="auth-submit-btn">Authorize Access</button>
+                <div class="auth-switch">New to OncoGraph? <a href="#" id="go-to-register">Register Node Account</a></div>
+            </form>
+
+            <!-- Register Form (Hidden by default) -->
+            <form id="register-form" style="display:none;">
+                <div class="auth-field">
+                    <label>Clinician Username</label>
+                    <input type="text" id="reg-username" required placeholder="e.g. dr_smith">
+                </div>
+                <div class="auth-field">
+                    <label>Email Address</label>
+                    <input type="email" id="reg-email" required placeholder="e.g. smith@hospital.org">
+                </div>
+                <div class="auth-field">
+                    <label>Secure Password</label>
+                    <input type="password" id="reg-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="auth-submit-btn" style="background: linear-gradient(135deg, var(--accent), var(--primary));">Register Node</button>
+                <div class="auth-switch">Already registered? <a href="#" id="go-to-login">Sign In</a></div>
+            </form>
+        </div>
     </div>
 
     <!-- Toast notification container -->
