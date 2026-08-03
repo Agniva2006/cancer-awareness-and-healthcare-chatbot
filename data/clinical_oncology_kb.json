@@ -1,0 +1,224 @@
+[
+  {
+    "id": "KB-001",
+    "title": "Febrile Neutropenia (Oncological Emergency)",
+    "category": "emergency_triage",
+    "content": "Febrile neutropenia is a medical emergency defined as a single oral temperature >= 100.4F (38.3C) or >= 100.0F (38.0C) sustained over 1 hour in a patient with an absolute neutrophil count (ANC) < 500/mcL. Patients require immediate broad-spectrum intravenous antibiotic coverage (e.g. Cefepime, Piperacillin-tazobactam) within 60 minutes to prevent septic shock and mortality.",
+    "source": "NCCN Guidelines for Prevention and Treatment of Cancer-Related Infections v2.2024",
+    "icd10": "D70.1",
+    "urgency": "RED"
+  },
+  {
+    "id": "KB-002",
+    "title": "Spinal Cord Compression (Oncological Emergency)",
+    "category": "emergency_triage",
+    "content": "Neoplastic spinal cord compression (SCC) presents with new or worsening progressive back pain, motor weakness, sensory level deficit, or bowel/bladder dysfunction (urinary retention or incontinence). Immediate IV dexamethasone (10-16mg loading dose) and urgent MRI of the whole spine are required followed by emergency surgical decompression or radiotherapy.",
+    "source": "ESMO Clinical Practice Guidelines: Spinal Cord Compression",
+    "icd10": "G95.20",
+    "urgency": "RED"
+  },
+  {
+    "id": "KB-003",
+    "title": "Superior Vena Cava (SVC) Syndrome",
+    "category": "emergency_triage",
+    "content": "SVC Syndrome results from compression of the superior vena cava, commonly by mediastinal tumors (Non-Small Cell Lung Cancer, Small Cell Lung Cancer, Lymphoma). Symptoms include facial edema, neck vein distension, dyspnea, and orthopnea. Treatment involves head elevation, systemic corticosteroids, endovascular stenting, or emergency radiation therapy.",
+    "source": "NCCN Guidelines: Non-Small Cell Lung Cancer",
+    "icd10": "I87.1",
+    "urgency": "RED"
+  },
+  {
+    "id": "KB-004",
+    "title": "Tumor Lysis Syndrome (TLS)",
+    "category": "emergency_triage",
+    "content": "Tumor Lysis Syndrome is a metabolic emergency caused by massive breakdown of tumor cells releasing potassium, phosphate, and uric acid into circulation. It causes hyperkalemia, hyperphosphatemia, hypocalcemia, and acute kidney injury. Management requires aggressive IV hydration, Rasburicase or Allopurinol, and telemetry monitoring.",
+    "source": "NCCN Guidelines for Acute Lymphoblastic Leukemia",
+    "icd10": "E88.3",
+    "urgency": "RED"
+  },
+  {
+    "id": "KB-005",
+    "title": "EGFR Mutations in Non-Small Cell Lung Cancer (NSCLC)",
+    "category": "biomarker",
+    "content": "Sensitizing EGFR mutations (Exon 19 deletions, Exon 21 L858R point mutation) predict response to third-generation EGFR Tyrosine Kinase Inhibitors (TKIs) such as Osimertinib as first-line therapy. Resistance mechanisms include the T790M secondary mutation (addressed by Osimertinib) or MET amplification.",
+    "source": "NCCN Guidelines: NSCLC Biomarker Testing",
+    "icd10": "C34.90",
+    "biomarker": "EGFR",
+    "recommended_therapy": "Osimertinib, Erlotinib, Gefitinib"
+  },
+  {
+    "id": "KB-006",
+    "title": "ALK Gene Rearrangements in NSCLC",
+    "category": "biomarker",
+    "content": "ALK gene fusions (EML4-ALK) occur in 3-5% of NSCLC, predominantly in non-smokers with adenocarcinoma. First-line targeted therapies include next-generation ALK TKIs: Alectinib, Brigatinib, or Lorlatinib, which demonstrate high intracranial response rates against brain metastases.",
+    "source": "NCCN Guidelines: NSCLC Biomarker Testing",
+    "icd10": "C34.90",
+    "biomarker": "ALK",
+    "recommended_therapy": "Alectinib, Brigatinib, Lorlatinib"
+  },
+  {
+    "id": "KB-007",
+    "title": "KRAS G12C Mutation in Solid Tumors",
+    "category": "biomarker",
+    "content": "KRAS G12C mutations are found in approximately 13% of NSCLC adenocarcinomas and 1-3% of colorectal cancers. FDA-approved targeted inhibitors Sotorasib and Adagrasib specifically bind the inactive GDP-bound state of KRAS G12C, blocking downstream RAS-MAPK signaling.",
+    "source": "FDA Oncology Biomarker Indications",
+    "icd10": "C34.90",
+    "biomarker": "KRAS G12C",
+    "recommended_therapy": "Sotorasib, Adagrasib"
+  },
+  {
+    "id": "KB-008",
+    "title": "HER2 (ERBB2) Overexpression in Breast Cancer",
+    "category": "biomarker",
+    "content": "HER2 amplification (IHC 3+ or FISH ratio >= 2.0) defines HER2-positive breast cancer. Standard targeted treatment combines monoclonal antibodies Trastuzumab and Pertuzumab with chemotherapy, followed by antibody-drug conjugates (ADCs) like Trastuzumab Deruxtecan (T-DXd) or Ado-Trastuzumab Emtansine (T-DM1).",
+    "source": "ASCO/CAP HER2 Testing Guidelines in Breast Cancer",
+    "icd10": "C50.919",
+    "biomarker": "HER2",
+    "recommended_therapy": "Trastuzumab, Pertuzumab, Trastuzumab Deruxtecan (T-DXd)"
+  },
+  {
+    "id": "KB-009",
+    "title": "BRCA1 and BRCA2 Germline Mutations",
+    "category": "biomarker",
+    "content": "Pathogenic germline BRCA1/2 mutations impair homologous recombination DNA repair (HRD). PARP inhibitors (Olaparib, Rucaparib, Niraparib, Talazoparib) induce synthetic lethality in BRCA-mutated ovarian, breast, prostate, and pancreatic cancers. Olaparib is approved for adjuvant treatment of high-risk HER2-negative early breast cancer.",
+    "source": "NCCN Guidelines: Genetic/Familial High-Risk Assessment",
+    "icd10": "Z15.01",
+    "biomarker": "BRCA1/2",
+    "recommended_therapy": "Olaparib, Niraparib, Rucaparib, Talazoparib"
+  },
+  {
+    "id": "KB-010",
+    "title": "PD-L1 Expression & Immunotherapy (ICI)",
+    "category": "biomarker",
+    "content": "Programmed Death-Ligand 1 (PD-L1) expression measured by Tumor Proportion Score (TPS) or Combined Positive Score (CPS) guides Immune Checkpoint Inhibitor (ICI) therapy (Pembrolizumab, Nivolumab, Atezolizumab). High PD-L1 (TPS >= 50%) in NSCLC supports single-agent Pembrolizumab first-line therapy.",
+    "source": "NCCN Guidelines: Cancer Immunotherapy",
+    "icd10": "Z51.11",
+    "biomarker": "PD-L1",
+    "recommended_therapy": "Pembrolizumab, Nivolumab, Atezolizumab"
+  },
+  {
+    "id": "KB-011",
+    "title": "Microsatellite Instability High (MSI-H) / dMMR",
+    "category": "biomarker",
+    "content": "Deficient Mismatch Repair (dMMR) resulting in MSI-High status causes high tumor mutational burden (TMB). Pembrolizumab and Dostarlimab are FDA-approved tissue-agnostic therapies for any unresectable or metastatic MSI-H/dMMR solid tumor.",
+    "source": "FDA Tissue-Agnostic Approval Guidelines",
+    "icd10": "C80.1",
+    "biomarker": "MSI-H / dMMR",
+    "recommended_therapy": "Pembrolizumab, Dostarlimab"
+  },
+  {
+    "id": "KB-012",
+    "title": "TNM Staging System for Non-Small Cell Lung Cancer (8th Edition)",
+    "category": "staging",
+    "content": "NSCLC staging uses the AJCC 8th Edition TNM classification: T (Primary Tumor size and invasion: T1 <= 3cm, T2 > 3-5cm, T3 > 5-7cm, T4 > 7cm or mediastinal invasion), N (Regional Lymph Nodes: N1 ipsilateral peribronchial/hilar, N2 ipsilateral mediastinal, N3 contralateral mediastinal/supraclavicular), M (Distant Metastasis: M1a pleural/pericardial effusion, M1b single extrathoracic, M1c multiple extrathoracic).",
+    "source": "AJCC Cancer Staging Manual 8th Edition",
+    "icd10": "C34.9"
+  },
+  {
+    "id": "KB-013",
+    "title": "TNM Staging for Breast Cancer",
+    "category": "staging",
+    "content": "Breast cancer staging incorporates anatomical TNM and prognostic biomarkers (ER, PR, HER2 status, Genomic grade/Oncotype DX score). Stage I is localized (T1 N0 M0), Stage II involves regional axillary nodes or larger tumors, Stage III is locally advanced (involvement of chest wall/skin or N2/N3 nodes), Stage IV indicates distant metastatic spread (bone, liver, lung, brain).",
+    "source": "AJCC Breast Cancer Staging 8th Edition",
+    "icd10": "C50.9"
+  },
+  {
+    "id": "KB-014",
+    "title": "TNM Staging for Colorectal Adenocarcinoma",
+    "category": "staging",
+    "content": "Colorectal cancer staging: Stage I (T1-T2 N0 M0: invades submucosa or muscularis propria), Stage II (T3-T4 N0 M0: invades through muscularis propria into subserosa or adjacent tissue), Stage III (Any T, N1-N2 M0: positive regional lymph nodes), Stage IV (Any T, Any N, M1: distant organ metastasis, e.g. liver, peritoneum, lung).",
+    "source": "AJCC Colon and Rectum Staging Manual",
+    "icd10": "C18.9"
+  },
+  {
+    "id": "KB-015",
+    "title": "FOLFOX Chemotherapy Protocol",
+    "category": "treatment_protocol",
+    "content": "FOLFOX (5-Fluorouracil, Leucovorin, Oxaliplatin) is a standard regimen for adjuvant treatment of Stage III colon cancer and first-line treatment for metastatic colorectal cancer. Key side effects include peripheral neuropathy (induced by oxaliplatin), neutropenia, diarrhea, and mucositis. Cold exposure worsens oxaliplatin-induced dysesthesia.",
+    "source": "NCCN Guidelines: Colon Cancer Treatment Protocols",
+    "icd10": "C18.9"
+  },
+  {
+    "id": "KB-016",
+    "title": "FOLFIRINOX Regimen for Pancreatic Adenocarcinoma",
+    "category": "treatment_protocol",
+    "content": "FOLFIRINOX (Oxaliplatin, Irinotecan, Leucovorin, 5-FU) is a high-intensity combination chemotherapy for fit patients with locally advanced or metastatic pancreatic ductal adenocarcinoma. Prophylactic G-CSF (Pegfilgrastim) is routinely administered to reduce neutropenia risks.",
+    "source": "NCCN Guidelines: Pancreatic Adenocarcinoma",
+    "icd10": "C25.9"
+  },
+  {
+    "id": "KB-017",
+    "title": "AC-T Chemotherapy for Breast Cancer",
+    "category": "treatment_protocol",
+    "content": "Doxorubicin (Adriamycin) + Cyclophosphamide followed by Paclitaxel (Taxol) (AC-T) is a dose-dense adjuvant regimen for high-risk HER2-negative breast cancer. Doxorubicin requires monitoring of cumulative lifetime dose due to cardiotoxicity (ECHO/MUGA scan LVEF monitoring).",
+    "source": "NCCN Guidelines: Invasive Breast Cancer",
+    "icd10": "C50.9"
+  },
+  {
+    "id": "KB-018",
+    "title": "Stereotactic Body Radiotherapy (SBRT / SABR)",
+    "category": "treatment_protocol",
+    "content": "SBRT delivers highly precise, ablative radiation doses in 1-5 fractions to small, well-defined tumors (e.g. Stage I NSCLC, oligometastatic lung/liver/spine lesions) with steep dose gradients, preserving adjacent healthy organ tissue.",
+    "source": "ASTRO Clinical Practice Guideline on SBRT",
+    "icd10": "Z51.0"
+  },
+  {
+    "id": "KB-019",
+    "title": "Immune Checkpoint Inhibitor Immune-Related Adverse Events (irAEs)",
+    "category": "emergency_triage",
+    "content": "ICIs (Pembrolizumab, Nivolumab, Ipilimumab) can trigger autoimmune irAEs affecting any organ: pneumonitis (cough, dyspnea), colitis (severe diarrhea, abdominal pain), hepatitis, hypophysitis, and myocarditis. Grade >= 2 irAEs mandate holding immunotherapy and initiating high-dose systemic corticosteroids (Prednisone 1-2 mg/kg/day).",
+    "source": "ASCO Clinical Practice Guideline: Management of Immune-Related Adverse Events",
+    "icd10": "T88.7",
+    "urgency": "YELLOW"
+  },
+  {
+    "id": "KB-020",
+    "title": "Chemotherapy-Induced Nausea and Vomiting (CINV) Antiemetic Guidelines",
+    "category": "symptoms",
+    "content": "For highly emetogenic chemotherapy (e.g. Cisplatin, Doxorubicin/Cyclophosphamide), standard 4-drug prophylactic antiemetic regimen includes an NK1 receptor antagonist (Aprepitant/Fosaprepitant), a 5-HT3 receptor antagonist (Ondansetron/Palonosetron), Dexamethasone, and Olanzapine.",
+    "source": "NCCN Guidelines: Antiemesis v1.2024",
+    "icd10": "R11.2"
+  },
+  {
+    "id": "KB-021",
+    "title": "Melanoma ABCDE Criteria & Dermoscopy Features",
+    "category": "symptoms",
+    "content": "Melanoma screening uses the ABCDE rule: Asymmetry, Border irregularity, Color variation (shades of brown, black, red, white, blue), Diameter > 6mm, Evolving (changes in size, shape, color, or symptoms like bleeding/itching). Dermoscopy reveals atypical pigment networks, streaks, and blue-white structures.",
+    "source": "AAD Clinical Guidelines for Cutaneous Melanoma",
+    "icd10": "C43.9"
+  },
+  {
+    "id": "KB-022",
+    "title": "Prostate Cancer PSA & Gleason Score (ISUP Grade Groups)",
+    "category": "biomarker",
+    "content": "Prostate cancer stratification relies on Serum Prostate-Specific Antigen (PSA), Digital Rectal Exam (DRE), and Gleason Score sum (Grade Group 1: Gleason <=6, Grade Group 2: 3+4=7, Grade Group 3: 4+3=7, Grade Group 4: Gleason 8, Grade Group 5: Gleason 9-10). Active surveillance is standard for low-risk disease.",
+    "source": "NCCN Guidelines: Prostate Cancer",
+    "icd10": "C61",
+    "biomarker": "PSA"
+  },
+  {
+    "id": "KB-023",
+    "title": "Palliative Care & Breakthrough Cancer Pain Management",
+    "category": "symptoms",
+    "content": "Cancer pain management follows the WHO analgesic ladder. Severe persistent cancer pain is managed with around-the-clock extended-release opioids (Morphine, Oxycodone, Fentanyl patch) plus rapid-onset immediate-release opioids dosed at 10-15% of the total 24-hour baseline opioid dose for breakthrough pain.",
+    "source": "NCCN Guidelines: Adult Cancer Pain v2.2024",
+    "icd10": "G89.3"
+  },
+  {
+    "id": "KB-024",
+    "title": "Hypercalcemia of Malignancy",
+    "category": "emergency_triage",
+    "content": "Hypercalcemia of malignancy (corrected calcium > 12 mg/dL) presents with confusion, lethargy, constipation, polyuria, and cardiac arrhythmias (shortened QT interval). Management requires aggressive IV normal saline rehydration, IV bisphosphonates (Zoledronic Acid 4mg) or Denosumab, and Calcitonin for rapid short-term lowering.",
+    "source": "Endocrine Society Clinical Practice Guidelines",
+    "icd10": "E83.52",
+    "urgency": "RED"
+  },
+  {
+    "id": "KB-025",
+    "title": "CAR T-Cell Therapy Cytokine Release Syndrome (CRS)",
+    "category": "emergency_triage",
+    "content": "Chimeric Antigen Receptor (CAR) T-cell therapies (e.g. Tisagenlecleucel, Axicabtagene ciloleucel) can trigger life-threatening CRS. Manifestations include high fever, hypotension, hypoxia, and multi-organ failure. Management involves Tocilizumab (IL-6 receptor antagonist) and Corticosteroids.",
+    "source": "ASTCT Consensus Grading for CRS and ICANS",
+    "icd10": "T80.89",
+    "urgency": "RED"
+  }
+]

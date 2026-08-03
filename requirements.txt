@@ -4,3 +4,5 @@ pydantic
 scikit-learn
 groq
 python-dotenv
+networkx
+numpy

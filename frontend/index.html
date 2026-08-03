@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cancer AI Assistant — Intelligent Healthcare Companion</title>
-    <meta name="description" content="An AI-powered cancer information assistant providing safe, structured, and reliable patient-focused responses using RAG and LLM technology.">
+    <title>OncoGraph AI — Clinical Cancer Intelligence Platform</title>
+    <meta name="description" content="Enterprise-grade AI clinical cancer intelligence platform with knowledge graph, virtual tumor board, federated learning, and DICOM imaging.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,23 +19,43 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <div class="logo-icon">🧬</div>
+                    <div class="logo-icon">&#x1F9EC;</div>
                     <div class="logo-text">
-                        <span class="logo-title">Cancer AI</span>
-                        <span class="logo-version">v2.0 Pro</span>
+                        <span class="logo-title">OncoGraph AI</span>
+                        <span class="logo-version">v4.0 Enterprise</span>
                     </div>
                 </div>
-                <button class="icon-btn" id="sidebar-close-btn" aria-label="Close sidebar">✕</button>
+                <button class="icon-btn" id="sidebar-close-btn" aria-label="Close sidebar">&#x2715;</button>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs" id="nav-tabs">
+                <button class="nav-tab active" data-panel="chat-panel" id="tab-chat">
+                    <span class="nav-tab-icon">&#x1F4AC;</span>
+                    <span>Chat</span>
+                </button>
+                <button class="nav-tab" data-panel="graph-panel" id="tab-graph">
+                    <span class="nav-tab-icon">&#x1F578;&#xFE0F;</span>
+                    <span>Graph</span>
+                </button>
+                <button class="nav-tab" data-panel="tumor-board-panel" id="tab-tumor">
+                    <span class="nav-tab-icon">&#x1FA7A;</span>
+                    <span>Tumor Board</span>
+                </button>
+                <button class="nav-tab" data-panel="federated-panel" id="tab-federated">
+                    <span class="nav-tab-icon">&#x1F3E5;</span>
+                    <span>Federated</span>
+                </button>
             </div>
 
             <button class="new-chat-btn" id="new-chat-btn">
-                <span class="btn-icon">＋</span> New Conversation
+                <span class="btn-icon">&#xFF0B;</span> New Conversation
             </button>
 
             <div class="sidebar-section">
                 <div class="section-title">
-                    <span>💬 Chat History</span>
-                    <button class="icon-btn-sm" id="clear-history-btn" title="Clear all history">🗑️</button>
+                    <span>&#x1F4AC; Chat History</span>
+                    <button class="icon-btn-sm" id="clear-history-btn" title="Clear all history">&#x1F5D1;&#xFE0F;</button>
                 </div>
                 <div class="history-search">
                     <input type="text" id="history-search-input" placeholder="Search conversations...">
@@ -46,18 +66,18 @@
             </div>
 
             <div class="sidebar-section">
-                <div class="section-title"><span>📊 Session Stats</span></div>
+                <div class="section-title"><span>&#x1F4CA; Platform Stats</span></div>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <span class="stat-value" id="stat-queries">0</span>
                         <span class="stat-label">Queries</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-value" id="stat-avg-conf">—</span>
+                        <span class="stat-value" id="stat-avg-conf">&mdash;</span>
                         <span class="stat-label">Avg Confidence</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-value" id="stat-avg-latency">—</span>
+                        <span class="stat-value" id="stat-avg-latency">&mdash;</span>
                         <span class="stat-label">Avg Latency</span>
                     </div>
                     <div class="stat-card">
@@ -68,8 +88,8 @@
             </div>
 
             <div class="sidebar-footer">
-                <button class="footer-btn" id="export-btn">📥 Export Chat</button>
-                <button class="footer-btn" id="theme-toggle-btn">🌙 Dark Mode</button>
+                <button class="footer-btn" id="export-btn">&#x1F4E5; Export Chat</button>
+                <button class="footer-btn" id="theme-toggle-btn">&#x1F319; Dark Mode</button>
             </div>
         </aside>
 
@@ -77,20 +97,24 @@
         <div class="main-content">
             <header class="chat-header">
                 <div class="header-left">
-                    <button class="icon-btn" id="sidebar-toggle-btn" aria-label="Toggle sidebar">☰</button>
+                    <button class="icon-btn" id="sidebar-toggle-btn" aria-label="Toggle sidebar">&#x2630;</button>
                     <div class="header-info">
-                        <h1>Cancer AI Assistant</h1>
-                        <p class="subtitle">RAG + LLM Powered · Safe · Reliable</p>
+                        <h1>OncoGraph AI <span style="font-size:0.7rem;padding:2px 8px;background:rgba(99,102,241,0.2);border-radius:12px;color:var(--accent)">v4.0 Enterprise</span></h1>
+                        <p class="subtitle">Knowledge Graph &middot; Virtual Tumor Board &middot; Federated Learning &middot; DICOM Imaging</p>
                     </div>
                 </div>
                 <div class="header-right">
                     <div class="voice-controls">
-                        <button class="control-btn" id="voice-input-btn" title="Voice Input (Speech-to-Text)">
-                            <span class="control-icon">🎤</span>
+                        <button class="control-btn" id="mode-toggle-btn" title="Toggle between Patient and Clinical Mode">
+                            <span class="control-icon">&#x1FA7A;</span>
+                            <span class="control-label" id="mode-label">Clinical</span>
+                        </button>
+                        <button class="control-btn" id="voice-input-btn" title="Voice Input">
+                            <span class="control-icon">&#x1F3A4;</span>
                             <span class="control-label">Voice</span>
                         </button>
-                        <button class="control-btn" id="tts-toggle-btn" title="Toggle Text-to-Speech for responses">
-                            <span class="control-icon">🔊</span>
+                        <button class="control-btn" id="tts-toggle-btn" title="Toggle Text-to-Speech">
+                            <span class="control-icon">&#x1F50A;</span>
                             <span class="control-label">Read</span>
                         </button>
                     </div>
@@ -101,65 +125,238 @@
                 </div>
             </header>
 
-            <!-- Quick Suggestions (shown when chat is mostly empty) -->
-            <div class="suggestions-overlay" id="suggestions-overlay">
-                <div class="suggestions-hero">
-                    <div class="hero-icon">🧬</div>
-                    <h2>What would you like to know?</h2>
-                    <p>Ask me anything about cancer awareness, symptoms, prevention, or treatments.</p>
+            <!-- Emergency Triage Banner Container -->
+            <div id="triage-banner-container"></div>
+
+            <!-- ============ CHAT PANEL ============ -->
+            <div class="panel active" id="chat-panel">
+                <!-- Quick Suggestions -->
+                <div class="suggestions-overlay" id="suggestions-overlay">
+                    <div class="suggestions-hero">
+                        <div class="hero-icon">&#x1F9EC;</div>
+                        <h2>Oncological Clinical &amp; Patient Decision Support</h2>
+                        <p>Search symptoms, biomarker mutations, NCCN/WHO guidelines, or upload dermoscopy/lab reports.</p>
+                    </div>
+                    <div class="suggestion-chips">
+                        <button class="chip" data-query="What is the protocol for Febrile Neutropenia emergency?">&#x1F6A8; Febrile Neutropenia Emergency</button>
+                        <button class="chip" data-query="EGFR Exon 19 deletion targeted therapy in NSCLC">&#x1F9EC; EGFR Mutation Targeted Therapy</button>
+                        <button class="chip" data-query="Explain TNM 8th Edition Staging for Lung Cancer">&#x1F4CA; TNM 8th Ed Lung Staging</button>
+                        <button class="chip" data-query="FOLFOX regimen side effects and neuropathy management">&#x1F48A; FOLFOX Colorectal Protocol</button>
+                        <button class="chip" data-query="HER2 positive breast cancer antibody drug conjugates">&#x1F3AF; HER2+ ADCs (Trastuzumab Deruxtecan)</button>
+                        <button class="chip" data-query="Immune Checkpoint Inhibitor pneumonitis irAE management">&#x1F6E1;&#xFE0F; Immunotherapy irAE Toxicity</button>
+                    </div>
                 </div>
-                <div class="suggestion-chips">
-                    <button class="chip" data-query="What are the early symptoms of lung cancer?">🫁 Lung Cancer Symptoms</button>
-                    <button class="chip" data-query="How can cancer be prevented?">🛡️ Cancer Prevention</button>
-                    <button class="chip" data-query="What is chemotherapy and how does it work?">💊 Chemotherapy Overview</button>
-                    <button class="chip" data-query="What are the risk factors for cancer?">⚠️ Risk Factors</button>
-                    <button class="chip" data-query="What are the side effects of radiation therapy?">☢️ Radiation Side Effects</button>
-                    <button class="chip" data-query="What is palliative care in cancer?">🤝 Palliative Care</button>
+
+                <main class="chat-window" id="chat-window">
+                    <div class="message system fade-in">
+                        <div class="avatar bot-avatar">&#x1F9EC;</div>
+                        <div class="message-bubble">
+                            <div class="message-text">
+                                <p>Hello! I'm <strong>OncoGraph AI</strong> -- your enterprise clinical intelligence copilot. I integrate knowledge graph reasoning, multi-agent tumor board analysis, and federated learning across 3 hospital networks.</p>
+                                <p>Choose a topic below or type your clinical question.</p>
+                            </div>
+                            <span class="disclaimer-badge">&#x2139;&#xFE0F; For clinical decision support only. Always consult a treating oncologist.</span>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- ============ KNOWLEDGE GRAPH PANEL ============ -->
+            <div class="panel" id="graph-panel">
+                <div class="dashboard-container">
+                    <div class="dashboard-header">
+                        <h2>&#x1F578;&#xFE0F; Oncological Knowledge Graph Explorer</h2>
+                        <p class="dashboard-subtitle">Traverse multi-relational clinical entity connections: Mutations &#x2192; Drugs &#x2192; Toxicities &#x2192; Protocols</p>
+                    </div>
+
+                    <div class="graph-controls">
+                        <div class="graph-control-group">
+                            <label>Query Type</label>
+                            <select id="graph-query-type">
+                                <option value="therapies">Mutation &#x2192; Therapies</option>
+                                <option value="toxicities">Drug &#x2192; Toxicities</option>
+                                <option value="biomarkers">Cancer &#x2192; Biomarkers</option>
+                                <option value="profile">Full Patient Profile</option>
+                                <option value="search">Entity Search</option>
+                            </select>
+                        </div>
+                        <div class="graph-control-group">
+                            <label>Entity ID / Query</label>
+                            <input type="text" id="graph-entity-input" placeholder="e.g. EGFR_EX19DEL, OSIMERTINIB, NSCLC...">
+                        </div>
+                        <button class="graph-run-btn" id="graph-run-btn">&#x1F50D; Traverse Graph</button>
+                    </div>
+
+                    <div class="graph-quick-actions">
+                        <button class="graph-chip" data-type="therapies" data-id="EGFR_EX19DEL">EGFR Ex19del &#x2192; Therapies</button>
+                        <button class="graph-chip" data-type="therapies" data-id="KRAS_G12C">KRAS G12C &#x2192; Therapies</button>
+                        <button class="graph-chip" data-type="biomarkers" data-id="NSCLC">NSCLC Biomarkers</button>
+                        <button class="graph-chip" data-type="toxicities" data-id="PEMBROLIZUMAB">Pembrolizumab Toxicities</button>
+                        <button class="graph-chip" data-type="profile" data-id="EGFR_EX19DEL,ALK_FUSION">Multi-Mutation Profile</button>
+                        <button class="graph-chip" data-type="biomarkers" data-id="BREAST_CANCER">Breast Cancer Biomarkers</button>
+                    </div>
+
+                    <div class="graph-stats-bar" id="graph-stats-bar">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <div class="graph-results" id="graph-results">
+                        <div class="empty-state">
+                            <span class="empty-icon">&#x1F578;&#xFE0F;</span>
+                            <p>Select a query type and entity to explore the knowledge graph</p>
+                        </div>
+                    </div>
+
+                    <!-- D3 / Vis.js style node visualization (simplified canvas) -->
+                    <div class="graph-canvas-container">
+                        <canvas id="graph-canvas" width="800" height="400"></canvas>
+                    </div>
                 </div>
             </div>
 
-            <main class="chat-window" id="chat-window">
-                <div class="message system fade-in">
-                    <div class="avatar bot-avatar">🧬</div>
-                    <div class="message-bubble">
-                        <div class="message-text">
-                            <p>Hello! I'm your <strong>Cancer Information Assistant</strong>. I can help you understand symptoms, treatments, prevention methods, and more.</p>
-                            <p>Choose a topic below or type your question.</p>
+            <!-- ============ TUMOR BOARD PANEL ============ -->
+            <div class="panel" id="tumor-board-panel">
+                <div class="dashboard-container">
+                    <div class="dashboard-header">
+                        <h2>&#x1FA7A; Virtual Multi-Agent Tumor Board</h2>
+                        <p class="dashboard-subtitle">4 specialist AI agents collaborate to produce a comprehensive clinical decision report</p>
+                    </div>
+
+                    <div class="tumor-board-form">
+                        <div class="tb-row">
+                            <div class="tb-field">
+                                <label>Clinical Question</label>
+                                <textarea id="tb-query" placeholder="e.g. 55yo male, NSCLC Stage IV, EGFR L858R, on Osimertinib, new brain metastases..." rows="3"></textarea>
+                            </div>
                         </div>
-                        <span class="disclaimer-badge">ℹ️ For informational purposes only. Always consult a doctor.</span>
+                        <div class="tb-row">
+                            <div class="tb-field">
+                                <label>Known Mutations</label>
+                                <input type="text" id="tb-mutations" placeholder="e.g. EGFR_L858R, KRAS_G12C (comma-separated)">
+                            </div>
+                            <div class="tb-field">
+                                <label>Cancer Type</label>
+                                <select id="tb-cancer-type">
+                                    <option value="">Not specified</option>
+                                    <option value="NSCLC">Non-Small Cell Lung Cancer</option>
+                                    <option value="SCLC">Small Cell Lung Cancer</option>
+                                    <option value="BREAST_CANCER">Breast Cancer</option>
+                                    <option value="CRC">Colorectal Cancer</option>
+                                    <option value="PANCREATIC">Pancreatic Cancer</option>
+                                    <option value="MELANOMA">Melanoma</option>
+                                    <option value="PROSTATE">Prostate Cancer</option>
+                                    <option value="OVARIAN">Ovarian Cancer</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="tb-row">
+                            <div class="tb-field">
+                                <label>Symptoms</label>
+                                <input type="text" id="tb-symptoms" placeholder="e.g. fever, cough, bone pain (comma-separated)">
+                            </div>
+                            <div class="tb-field">
+                                <label>Current Medications</label>
+                                <input type="text" id="tb-medications" placeholder="e.g. ketoconazole, warfarin (comma-separated)">
+                            </div>
+                        </div>
+                        <div class="tb-row">
+                            <div class="tb-field">
+                                <label>Stage</label>
+                                <select id="tb-stage">
+                                    <option value="">Not specified</option>
+                                    <option value="Stage I">Stage I</option>
+                                    <option value="Stage II">Stage II</option>
+                                    <option value="Stage III">Stage III</option>
+                                    <option value="Stage IV">Stage IV</option>
+                                </select>
+                            </div>
+                            <div class="tb-field" style="flex:none;">
+                                <label>&nbsp;</label>
+                                <button class="tb-run-btn" id="tb-run-btn">&#x1FA7A; Run Tumor Board Analysis</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick presets -->
+                    <div class="tb-presets">
+                        <button class="tb-preset-chip" data-preset="nsclc_egfr">NSCLC + EGFR L858R</button>
+                        <button class="tb-preset-chip" data-preset="breast_her2">Breast + HER2+ (with ketoconazole)</button>
+                        <button class="tb-preset-chip" data-preset="crc_msi">Colorectal MSI-H</button>
+                        <button class="tb-preset-chip" data-preset="melanoma_braf">Melanoma BRAF V600E</button>
+                    </div>
+
+                    <div class="tb-results" id="tb-results">
+                        <div class="empty-state">
+                            <span class="empty-icon">&#x1FA7A;</span>
+                            <p>Submit patient data to receive a multi-agent tumor board consensus report</p>
+                        </div>
                     </div>
                 </div>
-            </main>
+            </div>
+
+            <!-- ============ FEDERATED LEARNING PANEL ============ -->
+            <div class="panel" id="federated-panel">
+                <div class="dashboard-container">
+                    <div class="dashboard-header">
+                        <h2>&#x1F3E5; Federated Learning Network</h2>
+                        <p class="dashboard-subtitle">Distributed model training across 3 hospital nodes using FedAvg &mdash; no patient data leaves hospital perimeters</p>
+                    </div>
+
+                    <div class="fed-controls">
+                        <div class="fed-control-group">
+                            <label>Training Rounds</label>
+                            <input type="number" id="fed-rounds" value="3" min="1" max="10">
+                        </div>
+                        <div class="fed-control-group">
+                            <label>Local Epochs</label>
+                            <input type="number" id="fed-epochs" value="5" min="1" max="10">
+                        </div>
+                        <button class="fed-run-btn" id="fed-run-btn">&#x1F680; Launch Federated Training</button>
+                        <button class="fed-status-btn" id="fed-status-btn">&#x1F4CA; Check Status</button>
+                    </div>
+
+                    <div class="fed-hospitals" id="fed-hospitals">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <div class="fed-results" id="fed-results">
+                        <div class="empty-state">
+                            <span class="empty-icon">&#x1F3E5;</span>
+                            <p>Click "Launch Federated Training" to start a distributed training session across all hospital nodes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Voice Recording Indicator -->
             <div class="voice-recording-bar" id="voice-recording-bar">
                 <div class="recording-pulse"></div>
                 <span>Listening... Speak now</span>
-                <button class="icon-btn" id="stop-recording-btn">⏹️ Stop</button>
+                <button class="icon-btn" id="stop-recording-btn">&#x23F9;&#xFE0F; Stop</button>
             </div>
 
-            <!-- Image Preview (shown when user attaches an image) -->
+            <!-- Image Preview -->
             <div class="image-preview-container" id="image-preview-container">
                 <div class="image-preview-wrapper">
                     <img id="image-preview-img" src="" alt="Preview">
-                    <button class="image-preview-remove" id="image-preview-remove">✕</button>
+                    <button class="image-preview-remove" id="image-preview-remove">&#x2715;</button>
                 </div>
-                <div class="image-preview-label">📎 Image attached (visual context only)</div>
+                <div class="image-preview-label">&#x1F4CE; Image attached (visual context only)</div>
             </div>
 
-            <div class="input-container">
+            <div class="input-container" id="input-container">
                 <form id="chat-form">
                     <div class="input-wrapper">
-                        <button type="button" class="input-action-btn" id="image-upload-btn" title="Attach image">🖼️</button>
-                        <button type="button" class="input-action-btn" id="voice-mic-btn" title="Voice input">🎤</button>
-                        <textarea id="user-input" placeholder="Ask about symptoms, treatments, prevention..." rows="1" required></textarea>
+                        <button type="button" class="input-action-btn" id="image-upload-btn" title="Attach image">&#x1F5BC;&#xFE0F;</button>
+                        <button type="button" class="input-action-btn" id="voice-mic-btn" title="Voice input">&#x1F3A4;</button>
+                        <textarea id="user-input" placeholder="Ask about symptoms, treatments, biomarkers, or run graph queries..." rows="1" required></textarea>
                         <button type="submit" id="send-btn" aria-label="Send message">
                             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                         </button>
                     </div>
                     <div class="input-footer">
                         <span class="char-count" id="char-count">0 / 500</span>
-                        <span class="powered-by">Powered by Groq · Llama 3</span>
+                        <span class="powered-by">Powered by Groq &middot; Llama 3 &middot; NetworkX &middot; FedAvg</span>
                     </div>
                 </form>
                 <input type="file" accept="image/*" class="hidden-file-input" id="image-file-input">
@@ -169,7 +366,7 @@
 
     <!-- Image Lightbox -->
     <div class="lightbox" id="lightbox">
-        <button class="lightbox-close" id="lightbox-close">✕</button>
+        <button class="lightbox-close" id="lightbox-close">&#x2715;</button>
         <img id="lightbox-img" src="" alt="Full size">
     </div>
 
@@ -179,4 +376,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
