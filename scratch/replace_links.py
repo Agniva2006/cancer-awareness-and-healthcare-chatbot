@@ -1,4 +1,5 @@
 import pypdf
+from pypdf.generic import TextStringObject, NameObject
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -21,11 +22,9 @@ if "/Annots" in page:
             uri = annot_obj["/A"]["/URI"]
             if "iota-woad" in uri or "frontend-iota" in uri:
                 print("Found old URI to replace:", uri)
-                # Simple native dict update
-                annot_obj["/A"].update({
-                    "/URI": "https://cancer-awareness-and-healthcare-cha.vercel.app"
-                })
-                print("Updated to:", annot_obj["/A"]["/URI"])
+                # Correct pypdf text string object mapping
+                annot_obj["/A"][NameObject("/URI")] = TextStringObject("https://cancer-awareness-and-healthcare-cha.vercel.app")
+                print("Updated successfully!")
 
 with open(str(output_path), "wb") as f:
     writer.write(f)
