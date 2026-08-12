@@ -7,8 +7,9 @@
     <meta name="description" content="Enterprise-grade AI clinical cancer intelligence platform with knowledge graph, virtual tumor board, federated learning, and DICOM imaging.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-auth.css">
 </head>
 <body>
     <!-- Animated background particles -->
@@ -22,7 +23,7 @@
                     <div class="logo-icon">&#x1F9EC;</div>
                     <div class="logo-text">
                         <span class="logo-title">OncoGraph AI</span>
-                        <span class="logo-version">v4.0 Enterprise</span>
+                        <span class="logo-version">v4.1 Enterprise</span>
                     </div>
                 </div>
                 <button class="icon-btn" id="sidebar-close-btn" aria-label="Close sidebar">&#x2715;</button>
@@ -34,21 +35,25 @@
                     <span class="nav-tab-icon">&#x1F4AC;</span>
                     <span>Chat</span>
                 </button>
-                <button class="nav-tab" data-panel="graph-panel" id="tab-graph">
+                <button class="nav-tab" data-panel="graph-panel" id="tab-graph" data-plan-required="clinical">
                     <span class="nav-tab-icon">&#x1F578;&#xFE0F;</span>
                     <span>Graph</span>
+                    <span class="lock-pip" id="lock-graph">&#x1F512;</span>
                 </button>
-                <button class="nav-tab" data-panel="tumor-board-panel" id="tab-tumor">
+                <button class="nav-tab" data-panel="tumor-board-panel" id="tab-tumor" data-plan-required="enterprise">
                     <span class="nav-tab-icon">&#x1FA7A;</span>
                     <span>Tumor Board</span>
+                    <span class="lock-pip" id="lock-tumor">&#x1F512;</span>
                 </button>
-                <button class="nav-tab" data-panel="federated-panel" id="tab-federated">
+                <button class="nav-tab" data-panel="federated-panel" id="tab-federated" data-plan-required="enterprise">
                     <span class="nav-tab-icon">&#x1F3E5;</span>
                     <span>Federated</span>
+                    <span class="lock-pip" id="lock-federated">&#x1F512;</span>
                 </button>
-                <button class="nav-tab" data-panel="ml-panel" id="tab-ml">
+                <button class="nav-tab" data-panel="ml-panel" id="tab-ml" data-plan-required="clinical">
                     <span class="nav-tab-icon">&#x1F5A5;&#xFE0F;</span>
                     <span>ML Prognosis</span>
+                    <span class="lock-pip" id="lock-ml">&#x1F512;</span>
                 </button>
             </div>
 
@@ -92,6 +97,32 @@
             </div>
 
             <div class="sidebar-footer">
+                <!-- Usage quota bar -->
+                <div class="usage-quota-bar" id="sidebar-usage-bar" style="display:none">
+                    <div class="uqb-label">
+                        <span>Daily Quota</span>
+                        <span id="uqb-count">0/10</span>
+                    </div>
+                    <div class="uqb-track">
+                        <div class="uqb-fill" id="uqb-fill" style="width:0%"></div>
+                    </div>
+                </div>
+
+                <!-- User chip (shown when logged in) -->
+                <button class="user-chip" id="user-chip-btn" style="display:none" aria-label="Open profile">
+                    <div class="user-avatar" id="sidebar-avatar">?</div>
+                    <div class="user-chip-info">
+                        <div class="user-chip-name" id="sidebar-username">User</div>
+                        <span class="plan-badge free" id="sidebar-plan-badge">Free</span>
+                    </div>
+                    <span style="color:#475569;font-size:0.8rem">&#x2699;&#xFE0F;</span>
+                </button>
+
+                <!-- Upgrade nudge (shown for Free users) -->
+                <div class="upgrade-nudge" id="upgrade-nudge" style="display:none" onclick="openSubscriptionModal()">
+                    &#x26A1; Upgrade to Clinical &mdash; Unlock Graph + ML
+                </div>
+
                 <button class="footer-btn" id="export-btn">&#x1F4E5; Export Chat</button>
                 <button class="footer-btn" id="theme-toggle-btn">&#x1F319; Dark Mode</button>
                 <button class="footer-btn" id="logout-btn" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.25);color:var(--danger)">&#x1F6AA; Logout</button>
@@ -104,7 +135,7 @@
                 <div class="header-left">
                     <button class="icon-btn" id="sidebar-toggle-btn" aria-label="Toggle sidebar">&#x2630;</button>
                     <div class="header-info">
-                        <h1>OncoGraph AI <span style="font-size:0.7rem;padding:2px 8px;background:rgba(99,102,241,0.2);border-radius:12px;color:var(--accent)">v4.0 Enterprise</span></h1>
+                        <h1>OncoGraph AI <span style="font-size:0.7rem;padding:2px 8px;background:rgba(99,102,241,0.2);border-radius:12px;color:var(--accent)">v4.1 Enterprise</span></h1>
                         <p class="subtitle">Knowledge Graph &middot; Virtual Tumor Board &middot; Federated Learning &middot; DICOM Imaging</p>
                     </div>
                 </div>
@@ -129,6 +160,9 @@
                     </div>
                 </div>
             </header>
+
+            <!-- Notification banner area -->
+            <div id="notif-banner-area"></div>
 
             <!-- Emergency Triage Banner Container -->
             <div id="triage-banner-container"></div>
@@ -157,7 +191,7 @@
                         <div class="avatar bot-avatar">&#x1F9EC;</div>
                         <div class="message-bubble">
                             <div class="message-text">
-                                <p>Hello! I'm <strong>OncoGraph AI</strong> -- your enterprise clinical intelligence copilot. I integrate knowledge graph reasoning, multi-agent tumor board analysis, and federated learning across 3 hospital networks.</p>
+                                <p>Hello! I'm <strong>OncoGraph AI</strong> &mdash; your enterprise clinical intelligence copilot. I integrate knowledge graph reasoning, multi-agent tumor board analysis, and federated learning across 3 hospital networks.</p>
                                 <p>Choose a topic below or type your clinical question.</p>
                             </div>
                             <span class="disclaimer-badge">&#x2139;&#xFE0F; For clinical decision support only. Always consult a treating oncologist.</span>
@@ -167,7 +201,14 @@
             </div>
 
             <!-- ============ KNOWLEDGE GRAPH PANEL ============ -->
-            <div class="panel" id="graph-panel">
+            <div class="panel" id="graph-panel" style="position:relative">
+                <!-- Lock overlay (shown for Free users) -->
+                <div class="panel-lock-overlay" id="lock-overlay-graph" style="display:none">
+                    <div class="lock-icon">&#x1F512;</div>
+                    <div class="lock-title">Knowledge Graph Explorer</div>
+                    <div class="lock-desc">Traverse multi-relational clinical entity connections across mutations, drugs, toxicities, and protocols. Available on Clinical &amp; Enterprise plans.</div>
+                    <button class="lock-upgrade-btn" onclick="openSubscriptionModal()">&#x26A1; Upgrade to Clinical &mdash; $49/mo</button>
+                </div>
                 <div class="dashboard-container">
                     <div class="dashboard-header">
                         <h2>&#x1F578;&#xFE0F; Oncological Knowledge Graph Explorer</h2>
@@ -212,7 +253,6 @@
                         </div>
                     </div>
 
-                    <!-- D3 / Vis.js style node visualization (simplified canvas) -->
                     <div class="graph-canvas-container">
                         <canvas id="graph-canvas" width="800" height="400"></canvas>
                     </div>
@@ -220,7 +260,14 @@
             </div>
 
             <!-- ============ TUMOR BOARD PANEL ============ -->
-            <div class="panel" id="tumor-board-panel">
+            <div class="panel" id="tumor-board-panel" style="position:relative">
+                <!-- Lock overlay -->
+                <div class="panel-lock-overlay" id="lock-overlay-tumor" style="display:none">
+                    <div class="lock-icon">&#x1FA7A;</div>
+                    <div class="lock-title">Virtual Tumor Board</div>
+                    <div class="lock-desc">4 specialist AI agents collaborate to produce a comprehensive clinical decision report. Available on Enterprise plan only.</div>
+                    <button class="lock-upgrade-btn" onclick="openSubscriptionModal()">&#x26A1; Upgrade to Enterprise &mdash; $199/mo</button>
+                </div>
                 <div class="dashboard-container">
                     <div class="dashboard-header">
                         <h2>&#x1FA7A; Virtual Multi-Agent Tumor Board</h2>
@@ -282,7 +329,6 @@
                         </div>
                     </div>
 
-                    <!-- Quick presets -->
                     <div class="tb-presets">
                         <button class="tb-preset-chip" data-preset="nsclc_egfr">NSCLC + EGFR L858R</button>
                         <button class="tb-preset-chip" data-preset="breast_her2">Breast + HER2+ (with ketoconazole)</button>
@@ -300,7 +346,14 @@
             </div>
 
             <!-- ============ FEDERATED LEARNING PANEL ============ -->
-            <div class="panel" id="federated-panel">
+            <div class="panel" id="federated-panel" style="position:relative">
+                <!-- Lock overlay -->
+                <div class="panel-lock-overlay" id="lock-overlay-federated" style="display:none">
+                    <div class="lock-icon">&#x1F3E5;</div>
+                    <div class="lock-title">Federated Learning Network</div>
+                    <div class="lock-desc">Distributed model training across 3 hospital nodes using FedAvg &mdash; no patient data leaves hospital perimeters. Enterprise plan only.</div>
+                    <button class="lock-upgrade-btn" onclick="openSubscriptionModal()">&#x26A1; Upgrade to Enterprise &mdash; $199/mo</button>
+                </div>
                 <div class="dashboard-container">
                     <div class="dashboard-header">
                         <h2>&#x1F3E5; Federated Learning Network</h2>
@@ -334,7 +387,14 @@
             </div>
 
             <!-- ============ ML PROGNOSIS PANEL ============ -->
-            <div class="panel" id="ml-panel">
+            <div class="panel" id="ml-panel" style="position:relative">
+                <!-- Lock overlay -->
+                <div class="panel-lock-overlay" id="lock-overlay-ml" style="display:none">
+                    <div class="lock-icon">&#x1F5A5;&#xFE0F;</div>
+                    <div class="lock-title">ML Prognosis Predictor</div>
+                    <div class="lock-desc">Local Random Forest Classifier predicts cancer malignancy risk based on clinical biomarkers. Available on Clinical &amp; Enterprise plans.</div>
+                    <button class="lock-upgrade-btn" onclick="openSubscriptionModal()">&#x26A1; Upgrade to Clinical &mdash; $49/mo</button>
+                </div>
                 <div class="dashboard-container">
                     <div class="dashboard-header">
                         <h2>&#x1F5A5;&#xFE0F; Clinical ML Staging &amp; Prognosis Predictor</h2>
@@ -436,46 +496,387 @@
         <img id="lightbox-img" src="" alt="Full size">
     </div>
 
-    <!-- User Authentication Modal -->
-    <div class="auth-overlay active" id="auth-overlay">
+    <!-- ══════════════════════════════════════════
+         AUTH MODAL (Login / Register / Forgot PW)
+    ══════════════════════════════════════════ -->
+    <div id="auth-overlay" class="active">
         <div class="auth-container">
-            <div class="auth-header">
-                <span class="auth-logo">&#x1F9EC;</span>
+            <div class="auth-brand">
+                <div class="auth-logo-wrap">&#x1F9EC;</div>
                 <h2>OncoGraph AI</h2>
-                <p>Enterprise Clinical Workspace Sign-in</p>
+                <p>Enterprise Clinical Cancer Intelligence</p>
             </div>
-            
-            <!-- Login Form -->
-            <form id="login-form">
-                <div class="auth-field">
-                    <label>Username</label>
-                    <input type="text" id="login-username" required placeholder="e.g. oncologist_alpha">
-                </div>
-                <div class="auth-field">
-                    <label>Password</label>
-                    <input type="password" id="login-password" required placeholder="••••••••">
-                </div>
-                <button type="submit" class="auth-submit-btn">Authorize Access</button>
-                <div class="auth-switch">New to OncoGraph? <a href="#" id="go-to-register">Register Node Account</a></div>
-            </form>
 
-            <!-- Register Form (Hidden by default) -->
-            <form id="register-form" style="display:none;">
-                <div class="auth-field">
-                    <label>Clinician Username</label>
-                    <input type="text" id="reg-username" required placeholder="e.g. dr_smith">
+            <!-- Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="auth-tab-login" onclick="switchAuthTab('login')">Sign In</button>
+                <button class="auth-tab-btn" id="auth-tab-register" onclick="switchAuthTab('register')">Register</button>
+                <button class="auth-tab-btn" id="auth-tab-forgot" onclick="switchAuthTab('forgot')">Forgot PW</button>
+            </div>
+
+            <!-- Messages -->
+            <div class="auth-msg" id="auth-msg"></div>
+
+            <!-- ── Login Pane ── -->
+            <div class="auth-pane active" id="auth-pane-login">
+                <form id="login-form" autocomplete="on">
+                    <div class="auth-field">
+                        <label>Username</label>
+                        <input type="text" id="login-username" required placeholder="e.g. dr_smith" autocomplete="username">
+                    </div>
+                    <div class="auth-field">
+                        <label>Password <a href="#" class="forgot-link" onclick="switchAuthTab('forgot');return false;">Forgot?</a></label>
+                        <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <div class="auth-checkbox-row">
+                        <input type="checkbox" id="remember-me" checked>
+                        <label for="remember-me">Remember me for 30 days</label>
+                    </div>
+                    <button type="submit" class="auth-submit-btn" id="login-btn">&#x1F511; Authorize Access</button>
+                    <div class="auth-switch">New to OncoGraph? <a href="#" onclick="switchAuthTab('register');return false;">Create account</a></div>
+                </form>
+                <div class="auth-social-proof">
+                    <div class="sp-item"><span class="sp-value">2,400+</span><span class="sp-label">Clinical Users</span></div>
+                    <div class="sp-item"><span class="sp-value">180k+</span><span class="sp-label">Queries Served</span></div>
+                    <div class="sp-item"><span class="sp-value">99.2%</span><span class="sp-label">Uptime</span></div>
                 </div>
-                <div class="auth-field">
-                    <label>Email Address</label>
-                    <input type="email" id="reg-email" required placeholder="e.g. smith@hospital.org">
+            </div>
+
+            <!-- ── Register Pane ── -->
+            <div class="auth-pane" id="auth-pane-register">
+                <form id="register-form" autocomplete="off">
+                    <div class="auth-row">
+                        <div class="auth-field">
+                            <label>Full Name</label>
+                            <input type="text" id="reg-fullname" placeholder="Dr. Jane Smith">
+                        </div>
+                        <div class="auth-field">
+                            <label>Username *</label>
+                            <input type="text" id="reg-username" required placeholder="dr_jsmith">
+                        </div>
+                    </div>
+                    <div class="auth-field">
+                        <label>Email Address *</label>
+                        <input type="email" id="reg-email" required placeholder="jane@hospital.org">
+                    </div>
+                    <div class="auth-row">
+                        <div class="auth-field">
+                            <label>Specialty</label>
+                            <select id="reg-specialty">
+                                <option value="">Select specialty</option>
+                                <option value="Medical Oncology">Medical Oncology</option>
+                                <option value="Radiation Oncology">Radiation Oncology</option>
+                                <option value="Surgical Oncology">Surgical Oncology</option>
+                                <option value="Hematology">Hematology</option>
+                                <option value="Pathology">Pathology</option>
+                                <option value="Radiology">Radiology</option>
+                                <option value="Palliative Care">Palliative Care</option>
+                                <option value="Research">Research / Academia</option>
+                                <option value="Patient / Caregiver">Patient / Caregiver</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="auth-field">
+                            <label>Role</label>
+                            <select id="reg-role">
+                                <option value="clinician">Clinician</option>
+                                <option value="researcher">Researcher</option>
+                                <option value="patient">Patient</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="auth-field">
+                        <label>Institution</label>
+                        <input type="text" id="reg-institution" placeholder="e.g. Memorial Sloan Kettering">
+                    </div>
+                    <div class="auth-field">
+                        <label>Password *</label>
+                        <input type="password" id="reg-password" required placeholder="Min. 6 characters" autocomplete="new-password">
+                        <div class="strength-meter">
+                            <div class="strength-bar-track">
+                                <div class="strength-bar-fill" id="strength-fill"></div>
+                            </div>
+                            <span class="strength-label" id="strength-label">Enter password</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="auth-submit-btn" id="register-btn" style="background: linear-gradient(135deg, #059669, #0891b2);">&#x1F195; Create Clinical Account</button>
+                    <div class="auth-switch">Already registered? <a href="#" onclick="switchAuthTab('login');return false;">Sign in</a></div>
+                </form>
+            </div>
+
+            <!-- ── Forgot Password Pane ── -->
+            <div class="auth-pane" id="auth-pane-forgot">
+                <p style="color:#64748b;font-size:0.85rem;margin-bottom:16px;line-height:1.5">Enter your username to receive a password reset token. In production, this would be emailed to you.</p>
+                <form id="forgot-form">
+                    <div class="auth-field">
+                        <label>Username</label>
+                        <input type="text" id="forgot-username" placeholder="Enter your username">
+                    </div>
+                    <button type="submit" class="auth-submit-btn" style="background:linear-gradient(135deg,#0891b2,#0e7490)">&#x1F511; Generate Reset Token</button>
+                </form>
+                <div class="reset-token-box" id="reset-token-box">
+                    <strong>&#x1F512; Reset Token Generated</strong>
+                    <span id="reset-token-value"></span>
+                    <small style="display:block;margin-top:8px;color:#475569">In a production system, this token would be emailed to your registered address. Share with system administrator to reset your password.</small>
                 </div>
-                <div class="auth-field">
-                    <label>Secure Password</label>
-                    <input type="password" id="reg-password" required placeholder="••••••••">
+                <div class="auth-switch" style="margin-top:16px"><a href="#" onclick="switchAuthTab('login');return false;">Back to Sign In</a></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PROFILE MODAL
+    ══════════════════════════════════════════ -->
+    <div id="profile-modal">
+        <div class="profile-modal-box">
+            <button class="modal-close-btn" onclick="closeProfileModal()">&#x2715;</button>
+
+            <!-- Header -->
+            <div class="profile-header">
+                <div class="profile-avatar-large" id="profile-avatar-large">?</div>
+                <div class="profile-header-info">
+                    <p class="profile-header-name" id="profile-header-name">Username</p>
+                    <div class="profile-header-meta">
+                        <span class="role-tag" id="profile-role-tag">Clinician</span>
+                        <span class="plan-badge free" id="profile-plan-badge">Free</span>
+                        <span class="since" id="profile-since">Member since —</span>
+                    </div>
                 </div>
-                <button type="submit" class="auth-submit-btn" style="background: linear-gradient(135deg, var(--accent), var(--primary));">Register Node</button>
-                <div class="auth-switch">Already registered? <a href="#" id="go-to-login">Sign In</a></div>
-            </form>
+            </div>
+
+            <!-- Tabs -->
+            <div class="profile-tabs">
+                <button class="profile-tab active" data-ptab="info" onclick="switchProfileTab('info')">&#x1F464; Profile</button>
+                <button class="profile-tab" data-ptab="security" onclick="switchProfileTab('security')">&#x1F512; Security</button>
+                <button class="profile-tab" data-ptab="usage" onclick="switchProfileTab('usage')">&#x1F4CA; Usage</button>
+                <button class="profile-tab" data-ptab="activity" onclick="switchProfileTab('activity')">&#x1F4CB; Activity</button>
+                <button class="profile-tab" data-ptab="sessions" onclick="switchProfileTab('sessions')">&#x1F4BB; Sessions</button>
+            </div>
+
+            <!-- Content -->
+            <div class="profile-content">
+
+                <!-- ── Info pane ── -->
+                <div class="profile-pane active" id="ptab-info">
+                    <div class="pf-msg" id="pf-info-msg"></div>
+                    <div class="pf-row">
+                        <div>
+                            <label class="pf-label">Full Name</label>
+                            <input class="pf-input" type="text" id="pf-fullname" placeholder="Dr. Jane Smith">
+                        </div>
+                        <div>
+                            <label class="pf-label">Username</label>
+                            <input class="pf-input" type="text" id="pf-username" readonly>
+                        </div>
+                    </div>
+                    <label class="pf-label">Email Address</label>
+                    <input class="pf-input" type="email" id="pf-email" placeholder="jane@hospital.org">
+                    <div class="pf-row">
+                        <div>
+                            <label class="pf-label">Specialty</label>
+                            <input class="pf-input" type="text" id="pf-specialty" placeholder="e.g. Medical Oncology">
+                        </div>
+                        <div>
+                            <label class="pf-label">Institution</label>
+                            <input class="pf-input" type="text" id="pf-institution" placeholder="e.g. Johns Hopkins">
+                        </div>
+                    </div>
+                    <button class="pf-save-btn" id="pf-save-info-btn" onclick="saveProfileInfo()">Save Changes</button>
+                </div>
+
+                <!-- ── Security pane ── -->
+                <div class="profile-pane" id="ptab-security">
+                    <div class="pf-msg" id="pf-security-msg"></div>
+                    <label class="pf-label">Current Password</label>
+                    <input class="pf-input" type="password" id="pf-old-pw" placeholder="••••••••">
+                    <label class="pf-label">New Password</label>
+                    <input class="pf-input" type="password" id="pf-new-pw" placeholder="Min. 6 characters" oninput="updatePwStrength(this.value, 'pf-pw-strength-fill', 'pf-pw-strength-label')">
+                    <div class="strength-meter" style="margin-bottom:14px">
+                        <div class="strength-bar-track">
+                            <div class="strength-bar-fill" id="pf-pw-strength-fill"></div>
+                        </div>
+                        <span class="strength-label" id="pf-pw-strength-label">Enter new password</span>
+                    </div>
+                    <label class="pf-label">Confirm New Password</label>
+                    <input class="pf-input" type="password" id="pf-confirm-pw" placeholder="Repeat new password">
+                    <button class="pf-save-btn" onclick="changePassword()">Update Password</button>
+                </div>
+
+                <!-- ── Usage pane ── -->
+                <div class="profile-pane" id="ptab-usage">
+                    <div class="usage-grid">
+                        <div class="usage-stat-card">
+                            <span class="usage-stat-value" id="pf-queries-today">—</span>
+                            <div class="usage-stat-label">Queries Today</div>
+                        </div>
+                        <div class="usage-stat-card">
+                            <span class="usage-stat-value" id="pf-queries-month">—</span>
+                            <div class="usage-stat-label">Queries This Month</div>
+                        </div>
+                        <div class="usage-stat-card">
+                            <span class="usage-stat-value" id="pf-daily-remaining">—</span>
+                            <div class="usage-stat-label">Daily Remaining</div>
+                        </div>
+                        <div class="usage-stat-card">
+                            <span class="usage-stat-value" id="pf-monthly-remaining">—</span>
+                            <div class="usage-stat-label">Monthly Remaining</div>
+                        </div>
+                    </div>
+                    <div class="usage-progress-section">
+                        <div class="uqb-label-lg">
+                            <span>Daily Usage</span>
+                            <span id="pf-daily-label">0 / 10</span>
+                        </div>
+                        <div class="uqb-track-lg">
+                            <div class="uqb-fill-lg" id="pf-daily-bar" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <div class="usage-progress-section">
+                        <div class="uqb-label-lg">
+                            <span>Monthly Usage</span>
+                            <span id="pf-monthly-label">0 / 100</span>
+                        </div>
+                        <div class="uqb-track-lg">
+                            <div class="uqb-fill-lg" id="pf-monthly-bar" style="width:0%"></div>
+                        </div>
+                    </div>
+                    <button class="pf-save-btn" onclick="openSubscriptionModal();closeProfileModal();" style="background:linear-gradient(135deg,#059669,#0891b2);margin-top:8px">
+                        &#x26A1; View Plans &amp; Upgrade
+                    </button>
+                </div>
+
+                <!-- ── Activity pane ── -->
+                <div class="profile-pane" id="ptab-activity">
+                    <div id="pf-activity-content">
+                        <div class="activity-empty">Loading activity...</div>
+                    </div>
+                </div>
+
+                <!-- ── Sessions pane ── -->
+                <div class="profile-pane" id="ptab-sessions">
+                    <div id="pf-sessions-content">
+                        <div class="activity-empty">Loading sessions...</div>
+                    </div>
+                    <button class="logout-all-btn" onclick="logoutAllSessions()">&#x1F6AA; Logout All Devices</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         SUBSCRIPTION / PRICING MODAL
+    ══════════════════════════════════════════ -->
+    <div id="subscription-modal">
+        <div class="subscription-box">
+            <button class="modal-close-btn" onclick="closeSubscriptionModal()">&#x2715;</button>
+            <div class="sub-header">
+                <h2>&#x1F4B3; Choose Your Plan</h2>
+                <p>Upgrade to unlock the full OncoGraph AI clinical intelligence platform</p>
+            </div>
+            <div class="plans-grid" id="plans-grid">
+                <!-- Populated by JS -->
+            </div>
+            <div class="sub-demo-notice">
+                &#x1F6E0; <strong>Demo mode:</strong> Plan changes take effect instantly &mdash; no payment required for this prototype. In production, Stripe billing integration applies.
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         ONBOARDING WIZARD
+    ══════════════════════════════════════════ -->
+    <div id="onboarding-overlay">
+        <div class="onboarding-box">
+            <!-- Step dots -->
+            <div class="ob-steps">
+                <div class="ob-step-dot active" id="ob-dot-0"></div>
+                <div class="ob-step-dot" id="ob-dot-1"></div>
+                <div class="ob-step-dot" id="ob-dot-2"></div>
+            </div>
+
+            <!-- Step 0: Welcome + Role -->
+            <div class="ob-pane active" id="ob-step-0">
+                <div class="ob-title">Welcome to OncoGraph AI &#x1F9EC;</div>
+                <div class="ob-subtitle">Let's personalize your experience. What best describes your role?</div>
+                <div class="ob-options-grid">
+                    <div class="ob-option" data-ob-role="clinician" onclick="selectObOption(this,'role')">
+                        <div class="ob-option-icon">&#x1FA7A;</div>
+                        <div class="ob-option-label">Clinician</div>
+                        <div class="ob-option-desc">Oncologist, physician, NP/PA</div>
+                    </div>
+                    <div class="ob-option" data-ob-role="researcher" onclick="selectObOption(this,'role')">
+                        <div class="ob-option-icon">&#x1F52C;</div>
+                        <div class="ob-option-label">Researcher</div>
+                        <div class="ob-option-desc">Academic, biotech, pharma</div>
+                    </div>
+                    <div class="ob-option" data-ob-role="patient" onclick="selectObOption(this,'role')">
+                        <div class="ob-option-icon">&#x1F9D1;</div>
+                        <div class="ob-option-label">Patient / Caregiver</div>
+                        <div class="ob-option-desc">Seeking information & support</div>
+                    </div>
+                    <div class="ob-option" data-ob-role="student" onclick="selectObOption(this,'role')">
+                        <div class="ob-option-icon">&#x1F393;</div>
+                        <div class="ob-option-label">Student</div>
+                        <div class="ob-option-desc">Medical or science student</div>
+                    </div>
+                </div>
+                <div class="ob-nav">
+                    <button class="ob-btn" onclick="obNext()">Continue &#x2192;</button>
+                </div>
+            </div>
+
+            <!-- Step 1: Specialty focus -->
+            <div class="ob-pane" id="ob-step-1">
+                <div class="ob-title">Your Primary Focus</div>
+                <div class="ob-subtitle">Which cancer type or area do you work with most?</div>
+                <div class="ob-options-grid">
+                    <div class="ob-option" data-ob-focus="Lung Cancer" onclick="selectObOption(this,'focus')">
+                        <div class="ob-option-icon">&#x1FAC1;</div>
+                        <div class="ob-option-label">Lung / Thoracic</div>
+                    </div>
+                    <div class="ob-option" data-ob-focus="Breast Cancer" onclick="selectObOption(this,'focus')">
+                        <div class="ob-option-icon">&#x1F9E1;</div>
+                        <div class="ob-option-label">Breast</div>
+                    </div>
+                    <div class="ob-option" data-ob-focus="Hematology" onclick="selectObOption(this,'focus')">
+                        <div class="ob-option-icon">&#x1FA78;</div>
+                        <div class="ob-option-label">Hematology</div>
+                    </div>
+                    <div class="ob-option" data-ob-focus="GI Oncology" onclick="selectObOption(this,'focus')">
+                        <div class="ob-option-icon">&#x1F7E0;</div>
+                        <div class="ob-option-label">GI / Colorectal</div>
+                    </div>
+                    <div class="ob-option" data-ob-focus="General Oncology" onclick="selectObOption(this,'focus')">
+                        <div class="ob-option-icon">&#x1F9EC;</div>
+                        <div class="ob-option-label">General Oncology</div>
+                    </div>
+                    <div class="ob-option" data-ob-focus="Other" onclick="selectObOption(this,'focus')">
+                        <div class="ob-option-icon">&#x1F4CB;</div>
+                        <div class="ob-option-label">Other / All</div>
+                    </div>
+                </div>
+                <div class="ob-nav">
+                    <button class="ob-btn secondary" onclick="obBack()">&#x2190; Back</button>
+                    <button class="ob-btn" onclick="obNext()">Continue &#x2192;</button>
+                </div>
+            </div>
+
+            <!-- Step 2: First query -->
+            <div class="ob-pane" id="ob-step-2">
+                <div class="ob-title">&#x1F4AC; Try Your First Query</div>
+                <div class="ob-subtitle">Pick a sample question to get started &mdash; or just close and type your own.</div>
+                <div class="ob-sample-chips">
+                    <button class="ob-chip" data-query="What is the protocol for Febrile Neutropenia emergency?" onclick="selectObChip(this)">&#x1F6A8; Febrile Neutropenia Emergency Protocol</button>
+                    <button class="ob-chip" data-query="EGFR Exon 19 deletion targeted therapy options" onclick="selectObChip(this)">&#x1F9EC; EGFR Exon 19 Targeted Therapies</button>
+                    <button class="ob-chip" data-query="Explain immunotherapy side effects and irAE management" onclick="selectObChip(this)">&#x1F6E1;&#xFE0F; Immunotherapy irAE Management</button>
+                    <button class="ob-chip" data-query="TNM 8th edition staging for breast cancer" onclick="selectObChip(this)">&#x1F4CA; TNM Staging for Breast Cancer</button>
+                </div>
+                <div class="ob-nav">
+                    <button class="ob-btn secondary" onclick="obBack()">&#x2190; Back</button>
+                    <button class="ob-btn" onclick="finishOnboarding()">&#x1F680; Launch OncoGraph AI</button>
+                </div>
+            </div>
         </div>
     </div>
 

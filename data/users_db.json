@@ -1,7 +1,19 @@
 {
-  "test_oncologist": {
-    "password": "dda69783f28fdf6f1c5a83e8400f2472e9300887d1dffffe12a07b92a3d0aa25",
-    "email": "test@oncology.org",
-    "created_at": 1785786302.5068746
+  "demo": {
+    "password": "$2b$12$dMzxQiYncqwrObbLiFEFhOVaYh5vPDoG.7osgn/1VkD0/ODtHbyfq",
+    "email": "demo@oncograph.ai",
+    "full_name": "Demo Oncologist",
+    "specialty": "Medical Oncology",
+    "institution": "OncoGraph Demo Hospital",
+    "role": "clinician",
+    "plan": "enterprise",
+    "avatar_color": "#6366f1",
+    "created_at": "2026-08-13T00:00:00Z",
+    "last_login": "",
+    "onboarding_done": true,
+    "usage_daily": {},
+    "usage_monthly": {},
+    "activity": [],
+    "sessions": []
   }
 }

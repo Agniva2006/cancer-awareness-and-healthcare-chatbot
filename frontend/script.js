@@ -50,6 +50,13 @@ let pendingImageDataUrl = null;
 let currentMode = 'clinical';
 let activePanel = 'chat-panel';
 
+// ===== AUTH STATE =====
+let currentUser = null;    // { username, email, full_name, specialty, plan, ... }
+let authToken = null;      // JWT string
+
+// Plan hierarchy for gating
+const PLAN_LEVELS = { free: 0, clinical: 1, enterprise: 2 };
+
 // ===== INIT =====
 function init() {
     loadSessions();
@@ -65,13 +72,776 @@ function init() {
     setupMLPanel();
     updateStats();
     loadGraphStats();
+    setupPasswordStrengthMeter();
 }
 
-// ===== NAVIGATION TABS =====
+// ══════════════════════════════════════════════════════
+// AUTH SYSTEM — JWT-based
+// ══════════════════════════════════════════════════════
+
+function getAuthHeaders() {
+    if (!authToken) return { 'Content-Type': 'application/json' };
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+    };
+}
+
+function decodeJwt(token) {
+    try {
+        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        return JSON.parse(atob(base64));
+    } catch { return null; }
+}
+
+function isTokenExpired(token) {
+    const payload = decodeJwt(token);
+    if (!payload || !payload.exp) return true;
+    return Date.now() / 1000 > payload.exp;
+}
+
+function scheduleTokenExpiryCheck() {
+    const payload = decodeJwt(authToken);
+    if (!payload || !payload.exp) return;
+    const msUntilExpiry = (payload.exp * 1000) - Date.now();
+    if (msUntilExpiry > 0) {
+        // Warn 5 min before expiry
+        const warnMs = msUntilExpiry - 5 * 60 * 1000;
+        if (warnMs > 0) {
+            setTimeout(() => {
+                showNotifBanner('Your session expires in 5 minutes. <span class="nb-link" onclick="document.getElementById(\'logout-btn\').click()">Re-login</span>', 'warning');
+            }, warnMs);
+        }
+        setTimeout(() => {
+            showToast('Session expired. Please login again.', 'error');
+            doLogout();
+        }, msUntilExpiry);
+    }
+}
+
+function setupAuth() {
+    const authOverlay = document.getElementById('auth-overlay');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const forgotForm = document.getElementById('forgot-form');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userChipBtn = document.getElementById('user-chip-btn');
+
+    // ── Check persisted session ──
+    const savedToken = localStorage.getItem('onco_token');
+    const savedUser = localStorage.getItem('onco_user');
+
+    if (savedToken && savedUser && !isTokenExpired(savedToken)) {
+        authToken = savedToken;
+        currentUser = JSON.parse(savedUser);
+        authOverlay.classList.remove('active');
+        onLoginSuccess(currentUser, false);
+    } else {
+        localStorage.removeItem('onco_token');
+        localStorage.removeItem('onco_user');
+        authOverlay.classList.add('active');
+    }
+
+    // ── Login form submit ──
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        const rememberMe = document.getElementById('remember-me').checked;
+
+        setAuthMsg('', '');
+        setAuthBtnLoading('login-btn', true, 'Authorizing...');
+
+        try {
+            const resp = await fetch(API_URL + '/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, remember_me: rememberMe })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                authToken = data.access_token;
+                currentUser = data.user;
+                localStorage.setItem('onco_token', authToken);
+                localStorage.setItem('onco_user', JSON.stringify(currentUser));
+                authOverlay.classList.remove('active');
+                onLoginSuccess(currentUser, !currentUser.onboarding_done);
+            } else {
+                setAuthMsg(data.message || 'Login failed.', 'error');
+            }
+        } catch {
+            setAuthMsg('Cannot reach the server. Please check backend is running.', 'error');
+        } finally {
+            setAuthBtnLoading('login-btn', false, '&#x1F511; Authorize Access');
+        }
+    });
+
+    // ── Register form submit ──
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('reg-username').value.trim();
+        const email = document.getElementById('reg-email').value.trim();
+        const password = document.getElementById('reg-password').value;
+        const fullName = document.getElementById('reg-fullname').value.trim();
+        const specialty = document.getElementById('reg-specialty').value;
+        const institution = document.getElementById('reg-institution').value.trim();
+        const role = document.getElementById('reg-role').value;
+
+        setAuthMsg('', '');
+        setAuthBtnLoading('register-btn', true, 'Creating account...');
+
+        try {
+            const resp = await fetch(API_URL + '/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password, full_name: fullName, specialty, institution, role })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                setAuthMsg(data.message + ' Please sign in.', 'success');
+                setTimeout(() => switchAuthTab('login'), 1500);
+            } else {
+                setAuthMsg(data.message || 'Registration failed.', 'error');
+            }
+        } catch {
+            setAuthMsg('Cannot reach the server.', 'error');
+        } finally {
+            setAuthBtnLoading('register-btn', false, '&#x1F195; Create Clinical Account');
+        }
+    });
+
+    // ── Forgot password ──
+    forgotForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('forgot-username').value.trim();
+        if (!username) return;
+        // Generate a fake reset token (UI only)
+        const fakeToken = btoa(username + ':' + Date.now()).replace(/=/g, '').substring(0, 32);
+        document.getElementById('reset-token-value').textContent = fakeToken;
+        document.getElementById('reset-token-box').style.display = 'block';
+    });
+
+    // ── Logout ──
+    logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to log out?')) doLogout();
+    });
+
+    // ── User chip opens profile ──
+    if (userChipBtn) {
+        userChipBtn.addEventListener('click', openProfileModal);
+    }
+}
+
+function onLoginSuccess(user, showOnboarding = false) {
+    scheduleTokenExpiryCheck();
+    renderUserChip(user);
+    updatePlanGates(user.plan || 'free');
+    refreshUsageBar();
+    loadGraphStats();
+    showToast(`Welcome${user.full_name ? ', ' + user.full_name.split(' ')[0] : ''}! You're on the ${capitalise(user.plan || 'free')} plan.`, 'success');
+
+    if (showOnboarding) {
+        setTimeout(() => openOnboarding(), 400);
+    }
+}
+
+function doLogout() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('onco_token');
+    localStorage.removeItem('onco_user');
+    document.getElementById('auth-overlay').classList.add('active');
+    document.getElementById('login-form').reset();
+    document.getElementById('register-form').reset();
+    document.getElementById('user-chip-btn').style.display = 'none';
+    document.getElementById('sidebar-usage-bar').style.display = 'none';
+    document.getElementById('upgrade-nudge').style.display = 'none';
+    updatePlanGates('free');
+    showToast('Logged out successfully', 'info');
+}
+
+function setAuthMsg(msg, type) {
+    const el = document.getElementById('auth-msg');
+    el.textContent = msg;
+    el.className = 'auth-msg' + (msg && type ? ' ' + type : '');
+}
+
+function setAuthBtnLoading(id, loading, html) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.innerHTML = loading ? '⏳ ' + html : html;
+}
+
+// Auth tab switcher
+window.switchAuthTab = function(tab) {
+    ['login', 'register', 'forgot'].forEach(t => {
+        document.getElementById('auth-tab-' + t)?.classList.toggle('active', t === tab);
+        document.getElementById('auth-pane-' + t)?.classList.toggle('active', t === tab);
+    });
+    setAuthMsg('', '');
+};
+
+// ══════════════════════════════════════════════════════
+// PLAN GATES — show/hide lock overlays & badges
+// ══════════════════════════════════════════════════════
+
+function updatePlanGates(plan) {
+    const lvl = PLAN_LEVELS[plan] ?? 0;
+
+    // Graph: clinical+
+    const graphLocked = lvl < PLAN_LEVELS.clinical;
+    setOverlay('lock-overlay-graph', graphLocked);
+    setLockPip('lock-graph', graphLocked);
+
+    // ML: clinical+
+    const mlLocked = lvl < PLAN_LEVELS.clinical;
+    setOverlay('lock-overlay-ml', mlLocked);
+    setLockPip('lock-ml', mlLocked);
+
+    // Tumor board & Federated: enterprise only
+    const entLocked = lvl < PLAN_LEVELS.enterprise;
+    setOverlay('lock-overlay-tumor', entLocked);
+    setLockPip('lock-tumor', entLocked);
+    setOverlay('lock-overlay-federated', entLocked);
+    setLockPip('lock-federated', entLocked);
+
+    // Show upgrade nudge for free users
+    const nudge = document.getElementById('upgrade-nudge');
+    if (nudge) nudge.style.display = plan === 'free' ? 'block' : 'none';
+}
+
+function setOverlay(id, show) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? 'flex' : 'none';
+}
+
+function setLockPip(id, show) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? 'inline' : 'none';
+}
+
+function checkPlanGate(requiredPlan) {
+    if (!currentUser) return false;
+    const userLevel = PLAN_LEVELS[currentUser.plan || 'free'] ?? 0;
+    const reqLevel = PLAN_LEVELS[requiredPlan] ?? 0;
+    if (userLevel >= reqLevel) return true;
+    openSubscriptionModal();
+    return false;
+}
+
+// ══════════════════════════════════════════════════════
+// USER CHIP & SIDEBAR UI
+// ══════════════════════════════════════════════════════
+
+function renderUserChip(user) {
+    const chip = document.getElementById('user-chip-btn');
+    if (!chip) return;
+
+    const initials = getInitials(user.full_name || user.username);
+    const color = user.avatar_color || '#6366f1';
+    const plan = user.plan || 'free';
+
+    document.getElementById('sidebar-avatar').textContent = initials;
+    document.getElementById('sidebar-avatar').style.background = color;
+    document.getElementById('sidebar-username').textContent = user.full_name || user.username;
+
+    const planBadge = document.getElementById('sidebar-plan-badge');
+    planBadge.textContent = capitalise(plan);
+    planBadge.className = 'plan-badge ' + plan;
+
+    chip.style.display = 'flex';
+    document.getElementById('sidebar-usage-bar').style.display = 'block';
+}
+
+function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function capitalise(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+async function refreshUsageBar() {
+    if (!authToken || !currentUser) return;
+    try {
+        const resp = await fetch(API_URL + '/auth/usage', { headers: getAuthHeaders() });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.success) return;
+        const u = data.usage;
+
+        // Sidebar usage bar
+        const pct = u.daily_quota === 999999 ? 0 : Math.min(100, (u.queries_today / u.daily_quota) * 100);
+        const fill = document.getElementById('uqb-fill');
+        const countEl = document.getElementById('uqb-count');
+        if (fill) {
+            fill.style.width = pct + '%';
+            fill.className = 'uqb-fill' + (pct >= 80 ? ' danger' : '');
+        }
+        if (countEl) {
+            countEl.textContent = u.daily_quota === 999999 ? `${u.queries_today} used` : `${u.queries_today}/${u.daily_quota}`;
+        }
+    } catch {}
+}
+
+// ══════════════════════════════════════════════════════
+// PROFILE MODAL
+// ══════════════════════════════════════════════════════
+
+window.openProfileModal = function() {
+    if (!currentUser) return;
+    const modal = document.getElementById('profile-modal');
+    modal.classList.add('active');
+    loadProfileData();
+    switchProfileTab('info');
+};
+
+window.closeProfileModal = function() {
+    document.getElementById('profile-modal').classList.remove('active');
+};
+
+window.switchProfileTab = function(tab) {
+    document.querySelectorAll('.profile-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-ptab') === tab));
+    document.querySelectorAll('.profile-pane').forEach(p => p.classList.toggle('active', p.id === 'ptab-' + tab));
+
+    if (tab === 'usage') loadUsageTab();
+    if (tab === 'activity') loadActivityTab();
+    if (tab === 'sessions') loadSessionsTab();
+};
+
+function loadProfileData() {
+    if (!currentUser) return;
+    document.getElementById('pf-fullname').value = currentUser.full_name || '';
+    document.getElementById('pf-username').value = currentUser.username || '';
+    document.getElementById('pf-email').value = currentUser.email || '';
+    document.getElementById('pf-specialty').value = currentUser.specialty || '';
+    document.getElementById('pf-institution').value = currentUser.institution || '';
+
+    // Header
+    const initials = getInitials(currentUser.full_name || currentUser.username);
+    const color = currentUser.avatar_color || '#6366f1';
+    const avatar = document.getElementById('profile-avatar-large');
+    avatar.textContent = initials;
+    avatar.style.background = color;
+
+    document.getElementById('profile-header-name').textContent = currentUser.full_name || currentUser.username;
+    document.getElementById('profile-role-tag').textContent = capitalise(currentUser.role || 'clinician');
+
+    const pb = document.getElementById('profile-plan-badge');
+    pb.textContent = capitalise(currentUser.plan || 'free');
+    pb.className = 'plan-badge ' + (currentUser.plan || 'free');
+
+    const since = currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—';
+    document.getElementById('profile-since').textContent = 'Since ' + since;
+}
+
+window.saveProfileInfo = async function() {
+    if (!authToken) return;
+    const btn = document.getElementById('pf-save-info-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const body = {
+        full_name: document.getElementById('pf-fullname').value.trim(),
+        email: document.getElementById('pf-email').value.trim(),
+        specialty: document.getElementById('pf-specialty').value.trim(),
+        institution: document.getElementById('pf-institution').value.trim(),
+    };
+
+    try {
+        const resp = await fetch(API_URL + '/auth/profile/update', {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.success) {
+            currentUser = { ...currentUser, ...data.user };
+            localStorage.setItem('onco_user', JSON.stringify(currentUser));
+            renderUserChip(currentUser);
+            loadProfileData();
+            showPfMsg('pf-info-msg', 'Profile updated successfully!', 'success');
+        } else {
+            showPfMsg('pf-info-msg', data.detail || 'Update failed.', 'error');
+        }
+    } catch {
+        showPfMsg('pf-info-msg', 'Server error. Try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
+};
+
+window.changePassword = async function() {
+    if (!authToken) return;
+    const oldPw = document.getElementById('pf-old-pw').value;
+    const newPw = document.getElementById('pf-new-pw').value;
+    const confirmPw = document.getElementById('pf-confirm-pw').value;
+
+    if (newPw !== confirmPw) { showPfMsg('pf-security-msg', 'New passwords do not match.', 'error'); return; }
+    if (newPw.length < 6) { showPfMsg('pf-security-msg', 'New password must be at least 6 characters.', 'error'); return; }
+
+    try {
+        const resp = await fetch(API_URL + '/auth/profile/change-password', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ old_password: oldPw, new_password: newPw })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showPfMsg('pf-security-msg', 'Password changed successfully!', 'success');
+            document.getElementById('pf-old-pw').value = '';
+            document.getElementById('pf-new-pw').value = '';
+            document.getElementById('pf-confirm-pw').value = '';
+        } else {
+            showPfMsg('pf-security-msg', data.detail || 'Password change failed.', 'error');
+        }
+    } catch {
+        showPfMsg('pf-security-msg', 'Server error. Try again.', 'error');
+    }
+};
+
+async function loadUsageTab() {
+    if (!authToken) return;
+    try {
+        const resp = await fetch(API_URL + '/auth/usage', { headers: getAuthHeaders() });
+        const data = await resp.json();
+        if (!data.success) return;
+        const u = data.usage;
+
+        document.getElementById('pf-queries-today').textContent = u.queries_today;
+        document.getElementById('pf-queries-month').textContent = u.queries_month;
+        document.getElementById('pf-daily-remaining').textContent = u.daily_quota === 999999 ? '∞' : u.daily_remaining;
+        document.getElementById('pf-monthly-remaining').textContent = u.monthly_quota === 999999 ? '∞' : u.monthly_remaining;
+
+        const dailyPct = u.daily_quota === 999999 ? 5 : Math.min(100, (u.queries_today / u.daily_quota) * 100);
+        const monthlyPct = u.monthly_quota === 999999 ? 5 : Math.min(100, (u.queries_month / u.monthly_quota) * 100);
+
+        const dailyBar = document.getElementById('pf-daily-bar');
+        dailyBar.style.width = dailyPct + '%';
+        dailyBar.className = 'uqb-fill-lg' + (dailyPct >= 80 ? ' danger' : '');
+
+        const monthlyBar = document.getElementById('pf-monthly-bar');
+        monthlyBar.style.width = monthlyPct + '%';
+        monthlyBar.className = 'uqb-fill-lg' + (monthlyPct >= 80 ? ' danger' : '');
+
+        document.getElementById('pf-daily-label').textContent = u.daily_quota === 999999 ? `${u.queries_today} / ∞` : `${u.queries_today} / ${u.daily_quota}`;
+        document.getElementById('pf-monthly-label').textContent = u.monthly_quota === 999999 ? `${u.queries_month} / ∞` : `${u.queries_month} / ${u.monthly_quota}`;
+    } catch {}
+}
+
+async function loadActivityTab() {
+    if (!authToken) return;
+    const container = document.getElementById('pf-activity-content');
+    try {
+        const resp = await fetch(API_URL + '/auth/activity', { headers: getAuthHeaders() });
+        const data = await resp.json();
+        if (!data.success || data.activity.length === 0) {
+            container.innerHTML = '<div class="activity-empty">No activity recorded yet.</div>';
+            return;
+        }
+        container.innerHTML = `
+            <table class="activity-table">
+                <thead><tr><th>#</th><th>Endpoint</th><th>Time</th></tr></thead>
+                <tbody>
+                    ${data.activity.map((a, i) => `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td><code>${escapeHtml(a.endpoint)}</code></td>
+                            <td>${new Date(a.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+    } catch {
+        container.innerHTML = '<div class="activity-empty">Failed to load activity.</div>';
+    }
+}
+
+async function loadSessionsTab() {
+    if (!authToken) return;
+    const container = document.getElementById('pf-sessions-content');
+    try {
+        const resp = await fetch(API_URL + '/auth/sessions', { headers: getAuthHeaders() });
+        const data = await resp.json();
+        if (!data.success || data.sessions.length === 0) {
+            container.innerHTML = '<div class="activity-empty">No sessions recorded.</div>';
+            return;
+        }
+        container.innerHTML = data.sessions.map((s, i) => `
+            <div class="session-item">
+                <div class="session-dot"></div>
+                <span>Login ${i === 0 ? '(Most Recent)' : ''}</span>
+                <span>${new Date(s.login_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+        `).join('');
+    } catch {
+        container.innerHTML = '<div class="activity-empty">Failed to load sessions.</div>';
+    }
+}
+
+window.logoutAllSessions = function() {
+    if (confirm('This will log you out of all devices. Proceed?')) {
+        doLogout();
+    }
+};
+
+function showPfMsg(id, msg, type) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'pf-msg ' + type;
+    setTimeout(() => { el.className = 'pf-msg'; el.textContent = ''; }, 4000);
+}
+
+// ══════════════════════════════════════════════════════
+// SUBSCRIPTION MODAL
+// ══════════════════════════════════════════════════════
+
+window.openSubscriptionModal = function() {
+    const modal = document.getElementById('subscription-modal');
+    modal.classList.add('active');
+    renderPricingCards();
+};
+
+window.closeSubscriptionModal = function() {
+    document.getElementById('subscription-modal').classList.remove('active');
+};
+
+function renderPricingCards() {
+    const grid = document.getElementById('plans-grid');
+    const userPlan = currentUser?.plan || 'free';
+
+    const plans = [
+        {
+            id: 'free',
+            name: 'Free',
+            price: '$0',
+            period: '/month',
+            desc: 'Basic cancer Q&A for patients and caregivers',
+            highlights: ['10 AI queries per day', 'Basic cancer chatbot', 'Chat history & export', 'Voice input & TTS'],
+            popular: false,
+        },
+        {
+            id: 'clinical',
+            name: 'Clinical',
+            price: '$49',
+            period: '/month',
+            desc: 'For oncologists & clinical teams',
+            highlights: ['500 AI queries per day', 'Knowledge Graph Explorer', 'ML Prognosis Predictor', 'DICOM image analysis', 'Clinical mode & ICD-10 codes'],
+            popular: true,
+        },
+        {
+            id: 'enterprise',
+            name: 'Enterprise',
+            price: '$199',
+            period: '/month',
+            desc: 'Full platform for hospital networks',
+            highlights: ['Unlimited queries', 'Virtual Tumor Board (4 AI agents)', 'Federated Learning Network', 'All Clinical features', 'Priority support & SLA'],
+            popular: false,
+        },
+    ];
+
+    grid.innerHTML = plans.map(p => {
+        const isCurrent = p.id === userPlan;
+        const isDowngrade = PLAN_LEVELS[p.id] < PLAN_LEVELS[userPlan];
+        let btnClass = 'plan-cta-btn ';
+        let btnText = '';
+        if (isCurrent) { btnClass += 'current-plan'; btnText = '✓ Current Plan'; }
+        else if (isDowngrade) { btnClass += 'outline'; btnText = 'Switch to ' + p.name; }
+        else { btnClass += 'primary'; btnText = '⚡ Upgrade to ' + p.name; }
+
+        return `
+            <div class="plan-card${isCurrent ? ' current' : ''}${p.popular && !isCurrent ? ' popular' : ''}">
+                ${p.popular && !isCurrent ? '<div class="popular-badge">Most Popular</div>' : ''}
+                ${isCurrent ? '<div class="current-badge">✓ Active</div>' : ''}
+                <div class="plan-name">${p.name}</div>
+                <div class="plan-price">${p.price}<span>${p.period}</span></div>
+                <div class="plan-desc">${p.desc}</div>
+                <ul class="plan-features">
+                    ${p.highlights.map(h => `<li>${h}</li>`).join('')}
+                </ul>
+                <button class="${btnClass}" onclick="selectPlan('${p.id}')" ${isCurrent ? 'disabled' : ''}>${btnText}</button>
+            </div>`;
+    }).join('');
+}
+
+window.selectPlan = async function(planId) {
+    if (!authToken || !currentUser) { showToast('Please login to change plan.', 'error'); return; }
+    if (planId === currentUser.plan) return;
+
+    try {
+        const resp = await fetch(API_URL + '/auth/upgrade-plan', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ plan: planId })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            currentUser.plan = planId;
+            localStorage.setItem('onco_user', JSON.stringify(currentUser));
+            renderUserChip(currentUser);
+            updatePlanGates(planId);
+            renderPricingCards();
+            showToast(`Plan changed to ${capitalise(planId)}! New features are now unlocked.`, 'success');
+            // Close after short delay
+            setTimeout(() => closeSubscriptionModal(), 1200);
+        } else {
+            showToast(data.detail || 'Plan change failed.', 'error');
+        }
+    } catch {
+        showToast('Server error. Try again.', 'error');
+    }
+};
+
+// ══════════════════════════════════════════════════════
+// ONBOARDING WIZARD
+// ══════════════════════════════════════════════════════
+
+let obStep = 0;
+let obRole = '';
+let obFocus = '';
+let obQuery = '';
+
+function openOnboarding() {
+    document.getElementById('onboarding-overlay').classList.add('active');
+    obStep = 0;
+    renderObStep();
+}
+
+function closeOnboarding() {
+    document.getElementById('onboarding-overlay').classList.remove('active');
+}
+
+function renderObStep() {
+    [0, 1, 2].forEach(i => {
+        document.getElementById('ob-step-' + i).classList.toggle('active', i === obStep);
+        const dot = document.getElementById('ob-dot-' + i);
+        dot.classList.toggle('active', i === obStep);
+        dot.classList.toggle('done', i < obStep);
+    });
+}
+
+window.selectObOption = function(el, type) {
+    el.closest('.ob-options-grid').querySelectorAll('.ob-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    if (type === 'role') obRole = el.getAttribute('data-ob-role');
+    if (type === 'focus') obFocus = el.getAttribute('data-ob-focus');
+};
+
+window.selectObChip = function(el) {
+    el.closest('.ob-sample-chips').querySelectorAll('.ob-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    obQuery = el.getAttribute('data-query');
+};
+
+window.obNext = function() {
+    if (obStep < 2) { obStep++; renderObStep(); }
+};
+
+window.obBack = function() {
+    if (obStep > 0) { obStep--; renderObStep(); }
+};
+
+window.finishOnboarding = async function() {
+    closeOnboarding();
+    // Mark onboarding done
+    if (authToken) {
+        try {
+            await fetch(API_URL + '/auth/onboarding-complete', {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+        } catch {}
+    }
+    if (currentUser) currentUser.onboarding_done = true;
+
+    // Auto-fire selected query
+    if (obQuery) {
+        switchPanel('chat-panel');
+        setTimeout(() => {
+            userInput.value = obQuery;
+            chatForm.dispatchEvent(new Event('submit'));
+        }, 300);
+    }
+};
+
+// ══════════════════════════════════════════════════════
+// PASSWORD STRENGTH METER
+// ══════════════════════════════════════════════════════
+
+function setupPasswordStrengthMeter() {
+    const pwInput = document.getElementById('reg-password');
+    if (pwInput) {
+        pwInput.addEventListener('input', () => {
+            updatePwStrength(pwInput.value, 'strength-fill', 'strength-label');
+        });
+    }
+}
+
+window.updatePwStrength = function(pw, fillId, labelId) {
+    const fill = document.getElementById(fillId);
+    const label = document.getElementById(labelId);
+    if (!fill || !label) return;
+
+    let score = 0;
+    if (pw.length >= 6) score++;
+    if (pw.length >= 10) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+    const levels = [
+        { cls: '', pct: '0%', text: 'Enter password' },
+        { cls: 'weak', pct: '25%', text: 'Weak' },
+        { cls: 'fair', pct: '50%', text: 'Fair' },
+        { cls: 'good', pct: '75%', text: 'Good' },
+        { cls: 'strong', pct: '100%', text: 'Strong' },
+    ];
+    const lvl = pw.length === 0 ? 0 : Math.min(4, score);
+    fill.className = 'strength-bar-fill ' + levels[lvl].cls;
+    fill.style.width = levels[lvl].pct;
+    label.className = 'strength-label ' + levels[lvl].cls;
+    label.textContent = levels[lvl].text;
+};
+
+// ══════════════════════════════════════════════════════
+// NOTIFICATION BANNER
+// ══════════════════════════════════════════════════════
+
+function showNotifBanner(htmlMsg, type = 'info') {
+    const area = document.getElementById('notif-banner-area');
+    if (!area) return;
+    const div = document.createElement('div');
+    div.className = `notif-banner ${type}`;
+    div.innerHTML = htmlMsg;
+    area.appendChild(div);
+    setTimeout(() => div.remove(), 10000);
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION TABS (with plan gating)
+// ══════════════════════════════════════════════════════
+
 function setupNavTabs() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const panelId = tab.getAttribute('data-panel');
+            const planRequired = tab.getAttribute('data-plan-required');
+
+            if (planRequired && currentUser) {
+                const userLevel = PLAN_LEVELS[currentUser.plan || 'free'] ?? 0;
+                const reqLevel = PLAN_LEVELS[planRequired] ?? 0;
+                if (userLevel < reqLevel) {
+                    // Still switch panel but show lock overlay (already shown by updatePlanGates)
+                    switchPanel(panelId);
+                    return;
+                }
+            }
             switchPanel(panelId);
         });
     });
@@ -89,7 +859,6 @@ function switchPanel(panelId) {
 
     activePanel = panelId;
 
-    // Show/hide input bar based on panel
     if (inputContainer) {
         inputContainer.style.display = panelId === 'chat-panel' ? '' : 'none';
     }
@@ -219,7 +988,7 @@ function appendSystemWelcome() {
         <div class="avatar bot-avatar">&#x1F9EC;</div>
         <div class="message-bubble">
             <div class="message-text">
-                <p>Hello! I'm <strong>OncoGraph AI</strong> -- your enterprise clinical intelligence copilot. I integrate knowledge graph reasoning, multi-agent tumor board analysis, and federated learning across 3 hospital networks.</p>
+                <p>Hello! I'm <strong>OncoGraph AI</strong> &mdash; your enterprise clinical intelligence copilot. I integrate knowledge graph reasoning, multi-agent tumor board analysis, and federated learning across 3 hospital networks.</p>
                 <p>Choose a topic below or type your clinical question.</p>
             </div>
             <span class="disclaimer-badge">&#x2139;&#xFE0F; For clinical decision support only. Always consult a treating oncologist.</span>
@@ -342,7 +1111,6 @@ function removeTyping() {
 function formatBotResponse(data) {
     let html = '';
 
-    // Render Emergency Triage Banner
     if (data.triage && (data.triage.level === 'RED' || data.triage.level === 'YELLOW')) {
         const isRed = data.triage.level === 'RED';
         html += `
@@ -377,6 +1145,7 @@ function formatBotResponse(data) {
         if (data.confidence > 0) html += `<span class="metric-item">&#x1F3AF; ${(data.confidence * 100).toFixed(1)}%</span>`;
         if (data.latency > 0) html += `<span class="metric-item">&#x23F1;&#xFE0F; ${data.latency.toFixed(2)}s</span>`;
         if (data.mode) html += `<span class="metric-item">&#x1FA7A; Mode: ${escapeHtml(data.mode)}</span>`;
+        if (data.rate_limit?.remaining !== undefined) html += `<span class="metric-item">&#x1F4CB; ${data.rate_limit.remaining} remaining</span>`;
         html += `</div>`;
     }
 
@@ -394,6 +1163,13 @@ chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const query = userInput.value.trim();
     if (!query) return;
+
+    // Require auth
+    if (!authToken) {
+        showToast('Please log in to send queries.', 'error');
+        document.getElementById('auth-overlay').classList.add('active');
+        return;
+    }
 
     userMessageCount++;
     if (userMessageCount >= 1) suggestionsOverlay.classList.add('hidden');
@@ -430,16 +1206,24 @@ chatForm.addEventListener('submit', async (e) => {
 
         const resp = await fetch(API_URL + '/ask', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query,
-                chat_history: history,
-                image_data: imagePayload,
-                mode: currentMode
-            })
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ query, chat_history: history, image_data: imagePayload, mode: currentMode })
         });
         removeTyping();
+
+        if (resp.status === 401) {
+            showToast('Session expired. Please log in again.', 'error');
+            doLogout();
+            return;
+        }
+        if (resp.status === 429) {
+            const errData = await resp.json();
+            showToast(errData.detail || 'Daily quota reached. Upgrade your plan!', 'error');
+            showNotifBanner(`Daily query limit reached. <span class="nb-link" onclick="openSubscriptionModal()">Upgrade your plan</span> to continue.`, 'warning');
+            return;
+        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
         const data = await resp.json();
         data.query = query;
 
@@ -453,6 +1237,10 @@ chatForm.addEventListener('submit', async (e) => {
         renderHistory();
 
         if (ttsEnabled) speakRaw(data.answer);
+
+        // Refresh usage bar after each query
+        refreshUsageBar();
+
     } catch (err) {
         removeTyping();
         console.error(err);
@@ -515,10 +1303,7 @@ themeToggleBtn.addEventListener('click', () => {
 // ===== VOICE INPUT =====
 function setupSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        showToast('Speech recognition not supported', 'error');
-        return null;
-    }
+    if (!SpeechRecognition) { showToast('Speech recognition not supported', 'error'); return null; }
     const rec = new SpeechRecognition();
     rec.continuous = false;
     rec.interimResults = true;
@@ -530,11 +1315,7 @@ function setupSpeechRecognition() {
         userInput.dispatchEvent(new Event('input'));
     };
     rec.onend = () => stopVoiceRecording();
-    rec.onerror = (e) => {
-        console.error('Speech error:', e.error);
-        stopVoiceRecording();
-        if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'error');
-    };
+    rec.onerror = (e) => { console.error('Speech error:', e.error); stopVoiceRecording(); if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'error'); };
     return rec;
 }
 
@@ -560,10 +1341,7 @@ function stopVoiceRecording() {
 
 voiceInputBtn.addEventListener('click', () => isRecording ? stopVoiceRecording() : startVoiceRecording());
 voiceMicBtn.addEventListener('click', () => isRecording ? stopVoiceRecording() : startVoiceRecording());
-stopRecordingBtn.addEventListener('click', () => {
-    stopVoiceRecording();
-    if (userInput.value.trim()) chatForm.dispatchEvent(new Event('submit'));
-});
+stopRecordingBtn.addEventListener('click', () => { stopVoiceRecording(); if (userInput.value.trim()) chatForm.dispatchEvent(new Event('submit')); });
 
 // ===== TEXT-TO-SPEECH =====
 ttsToggleBtn.addEventListener('click', () => {
@@ -657,12 +1435,18 @@ window.openLightbox = function(src) {
 };
 lightboxClose.addEventListener('click', () => lightbox.classList.remove('active'));
 lightbox.addEventListener('click', (e) => { if (e.target === lightbox) lightbox.classList.remove('active'); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && lightbox.classList.contains('active')) lightbox.classList.remove('active'); });
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        lightbox.classList.remove('active');
+        closeProfileModal();
+        closeSubscriptionModal();
+    }
+});
 
 
-// =============================================
+// ═══════════════════════════════════════════════════════
 // KNOWLEDGE GRAPH PANEL
-// =============================================
+// ═══════════════════════════════════════════════════════
 function setupGraphPanel() {
     const graphRunBtn = document.getElementById('graph-run-btn');
     graphRunBtn.addEventListener('click', runGraphQuery);
@@ -678,7 +1462,7 @@ function setupGraphPanel() {
 
 async function loadGraphStats() {
     try {
-        const resp = await fetch(API_URL + '/graph/stats');
+        const resp = await fetch(API_URL + '/graph/stats', { headers: getAuthHeaders() });
         if (!resp.ok) return;
         const data = await resp.json();
         const bar = document.getElementById('graph-stats-bar');
@@ -711,9 +1495,10 @@ async function runGraphQuery() {
 
         const resp = await fetch(API_URL + '/graph/traverse', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(body)
         });
+        if (resp.status === 403) { showToast('Upgrade to Clinical plan to use Knowledge Graph.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         renderGraphResults(queryType, data);
     } catch (e) {
@@ -726,49 +1511,30 @@ async function runGraphQuery() {
 
 function renderGraphResults(queryType, data) {
     const container = document.getElementById('graph-results');
-
-    if (data.error) {
-        container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escapeHtml(data.error)}</p></div>`;
-        return;
-    }
-
+    if (data.error) { container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escapeHtml(data.error)}</p></div>`; return; }
     let html = '';
     const results = data.results || data.path || [];
 
     if (queryType === 'therapies' && Array.isArray(results)) {
         html += `<div style="margin-bottom:12px;font-size:.85rem;color:var(--text-muted)">Found ${results.length} targeted therapy option(s) for <strong style="color:var(--primary)">${escapeHtml(data.mutation_id || '')}</strong></div>`;
-        results.forEach(t => {
-            html += `<div class="result-card">
-                <div class="rc-title"><span class="rc-badge drug">${escapeHtml(t.drug_class)}</span>${escapeHtml(t.drug_label)}</div>
-                <div class="rc-meta"><strong>Evidence:</strong> ${escapeHtml(t.evidence)}</div>
-            </div>`;
-        });
+        results.forEach(t => { html += `<div class="result-card"><div class="rc-title"><span class="rc-badge drug">${escapeHtml(t.drug_class)}</span>${escapeHtml(t.drug_label)}</div><div class="rc-meta"><strong>Evidence:</strong> ${escapeHtml(t.evidence)}</div></div>`; });
     } else if (queryType === 'toxicities' && Array.isArray(results)) {
         html += `<div style="margin-bottom:12px;font-size:.85rem;color:var(--text-muted)">Found ${results.length} known toxicity(ies) for <strong style="color:var(--primary)">${escapeHtml(data.drug_id || '')}</strong></div>`;
-        results.forEach(t => {
-            html += `<div class="result-card"><div class="rc-title"><span class="rc-badge toxicity">CTCAE</span>${escapeHtml(t.toxicity_label)}</div></div>`;
-        });
+        results.forEach(t => { html += `<div class="result-card"><div class="rc-title"><span class="rc-badge toxicity">CTCAE</span>${escapeHtml(t.toxicity_label)}</div></div>`; });
     } else if (queryType === 'biomarkers' && Array.isArray(results)) {
         html += `<div style="margin-bottom:12px;font-size:.85rem;color:var(--text-muted)">Found ${results.length} biomarker(s) for <strong style="color:var(--primary)">${escapeHtml(data.cancer_id || '')}</strong></div>`;
-        results.forEach(b => {
-            html += `<div class="result-card"><div class="rc-title"><span class="rc-badge biomarker">Biomarker</span>${escapeHtml(b.biomarker_label)}</div><div class="rc-meta">ID: <code>${escapeHtml(b.biomarker_id)}</code></div></div>`;
-        });
+        results.forEach(b => { html += `<div class="result-card"><div class="rc-title"><span class="rc-badge biomarker">Biomarker</span>${escapeHtml(b.biomarker_label)}</div><div class="rc-meta">ID: <code>${escapeHtml(b.biomarker_id)}</code></div></div>`; });
     } else if (queryType === 'profile' && data.results) {
         const p = data.results;
         html += `<div style="margin-bottom:12px;font-size:.85rem;color:var(--text-muted)">Full genomic patient profile</div>`;
         html += `<div class="result-card"><div class="rc-title">Mutations (${p.mutations?.length || 0})</div><div class="rc-meta">${(p.mutations || []).map(m => `<span class="rc-badge mutation">${escapeHtml(m.label)}</span>`).join(' ')}</div></div>`;
         html += `<div class="result-card"><div class="rc-title">Targeted Therapies (${p.therapies?.length || 0})</div><div class="rc-meta">${(p.therapies || []).map(t => `<span class="rc-badge drug">${escapeHtml(t.drug_label)}</span>`).join(' ')}</div></div>`;
-        if (p.toxicities?.length > 0) {
-            html += `<div class="result-card"><div class="rc-title">Known Toxicities (${p.toxicities.length})</div><div class="rc-meta">${p.toxicities.map(t => `<span class="rc-badge toxicity">${escapeHtml(t.toxicity_label)}</span>`).join(' ')}</div></div>`;
-        }
+        if (p.toxicities?.length > 0) { html += `<div class="result-card"><div class="rc-title">Known Toxicities (${p.toxicities.length})</div><div class="rc-meta">${p.toxicities.map(t => `<span class="rc-badge toxicity">${escapeHtml(t.toxicity_label)}</span>`).join(' ')}</div></div>`; }
     } else if (queryType === 'search' && Array.isArray(results)) {
-        results.forEach(r => {
-            html += `<div class="result-card"><div class="rc-title"><span class="rc-badge biomarker">${escapeHtml(r.type)}</span>${escapeHtml(r.label)}</div><div class="rc-meta">ID: <code>${escapeHtml(r.id)}</code></div></div>`;
-        });
+        results.forEach(r => { html += `<div class="result-card"><div class="rc-title"><span class="rc-badge biomarker">${escapeHtml(r.type)}</span>${escapeHtml(r.label)}</div><div class="rc-meta">ID: <code>${escapeHtml(r.id)}</code></div></div>`; });
     } else {
         html = `<div class="empty-state"><p>No results found</p></div>`;
     }
-
     container.innerHTML = html;
 }
 
@@ -779,20 +1545,17 @@ async function drawGraphVisualization() {
     canvas.height = 400;
 
     try {
-        const resp = await fetch(API_URL + '/graph/export');
+        const resp = await fetch(API_URL + '/graph/export', { headers: getAuthHeaders() });
         if (!resp.ok) return;
         const data = await resp.json();
 
         const nodeTypeColors = {
             'CANCER_TYPE': '#f87171', 'BIOMARKER': '#34d399', 'DRUG': '#818cf8',
-            'PROTOCOL': '#fbbf24', 'TOXICITY': '#fb7185', 'STAGING': '#38bdf8',
-            'EMERGENCY': '#ef4444'
+            'PROTOCOL': '#fbbf24', 'TOXICITY': '#fb7185', 'STAGING': '#38bdf8', 'EMERGENCY': '#ef4444'
         };
 
         const nodes = data.nodes || [];
         const edges = data.edges || [];
-
-        // Layout: force-directed simulation (simple)
         const positions = {};
         const cx = canvas.width / 2, cy = canvas.height / 2;
         nodes.forEach((n, i) => {
@@ -801,9 +1564,7 @@ async function drawGraphVisualization() {
             positions[n.id] = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
         });
 
-        // Simple force simulation (10 iterations)
         for (let iter = 0; iter < 10; iter++) {
-            // Repulsion
             nodes.forEach((a, i) => {
                 nodes.forEach((b, j) => {
                     if (i >= j) return;
@@ -811,119 +1572,64 @@ async function drawGraphVisualization() {
                     const dx = pb.x - pa.x, dy = pb.y - pa.y;
                     const dist = Math.max(Math.hypot(dx, dy), 1);
                     const force = 800 / (dist * dist);
-                    pa.x -= (dx / dist) * force;
-                    pa.y -= (dy / dist) * force;
-                    pb.x += (dx / dist) * force;
-                    pb.y += (dy / dist) * force;
+                    pa.x -= (dx / dist) * force; pa.y -= (dy / dist) * force;
+                    pb.x += (dx / dist) * force; pb.y += (dy / dist) * force;
                 });
             });
-            // Attraction
             edges.forEach(e => {
                 const pa = positions[e.source], pb = positions[e.target];
                 if (!pa || !pb) return;
                 const dx = pb.x - pa.x, dy = pb.y - pa.y;
                 const dist = Math.hypot(dx, dy);
                 const force = dist * 0.005;
-                pa.x += (dx / dist) * force;
-                pa.y += (dy / dist) * force;
-                pb.x -= (dx / dist) * force;
-                pb.y -= (dy / dist) * force;
+                pa.x += (dx / dist) * force; pa.y += (dy / dist) * force;
+                pb.x -= (dx / dist) * force; pb.y -= (dy / dist) * force;
             });
-            // Center gravity
             nodes.forEach(n => {
                 const p = positions[n.id];
-                p.x += (cx - p.x) * 0.01;
-                p.y += (cy - p.y) * 0.01;
+                p.x += (cx - p.x) * 0.01; p.y += (cy - p.y) * 0.01;
                 p.x = Math.max(30, Math.min(canvas.width - 30, p.x));
                 p.y = Math.max(30, Math.min(canvas.height - 30, p.y));
             });
         }
 
-        // Draw edges
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         edges.forEach(e => {
             const pa = positions[e.source], pb = positions[e.target];
             if (!pa || !pb) return;
-            ctx.beginPath();
-            ctx.moveTo(pa.x, pa.y);
-            ctx.lineTo(pb.x, pb.y);
-            ctx.strokeStyle = 'rgba(129,140,248,0.15)';
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y);
+            ctx.strokeStyle = 'rgba(129,140,248,0.15)'; ctx.lineWidth = 0.8; ctx.stroke();
         });
-
-        // Draw nodes
         nodes.forEach(n => {
             const p = positions[n.id];
             const color = nodeTypeColors[n.type] || '#94a3b8';
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Label (only for small graphs)
+            ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = color; ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.stroke();
             if (nodes.length < 60) {
-                ctx.font = '8px Inter, sans-serif';
-                ctx.fillStyle = 'rgba(148,163,184,0.7)';
-                ctx.textAlign = 'center';
-                ctx.fillText(n.id.replace(/_/g, ' ').substring(0, 16), p.x, p.y + 14);
+                ctx.font = '8px Inter, sans-serif'; ctx.fillStyle = 'rgba(148,163,184,0.7)';
+                ctx.textAlign = 'center'; ctx.fillText(n.id.replace(/_/g, ' ').substring(0, 16), p.x, p.y + 14);
             }
         });
-
     } catch (e) {
-        ctx.font = '14px Inter, sans-serif';
-        ctx.fillStyle = '#64748b';
-        ctx.textAlign = 'center';
+        ctx.font = '14px Inter, sans-serif'; ctx.fillStyle = '#64748b'; ctx.textAlign = 'center';
         ctx.fillText('Knowledge graph visualization (connect backend to render)', canvas.width / 2, canvas.height / 2);
     }
 }
 
 
-// =============================================
+// ═══════════════════════════════════════════════════════
 // TUMOR BOARD PANEL
-// =============================================
+// ═══════════════════════════════════════════════════════
 const TB_PRESETS = {
-    nsclc_egfr: {
-        query: '55-year-old male, Stage IV NSCLC, EGFR L858R mutation detected on NGS, currently on Osimertinib, presenting with new CNS metastases.',
-        mutations: 'EGFR_L858R',
-        cancer_type: 'NSCLC',
-        symptoms: 'headache, vision changes',
-        medications: '',
-        stage: 'Stage IV'
-    },
-    breast_her2: {
-        query: '48-year-old female, HER2-positive metastatic breast cancer, progressed on Trastuzumab+Pertuzumab. Currently taking ketoconazole for fungal infection.',
-        mutations: 'HER2_AMP',
-        cancer_type: 'BREAST_CANCER',
-        symptoms: 'fatigue, bone pain',
-        medications: 'ketoconazole',
-        stage: 'Stage IV'
-    },
-    crc_msi: {
-        query: '62-year-old male, metastatic colorectal cancer, MSI-High/dMMR confirmed. Failed FOLFOX. Evaluating immunotherapy options.',
-        mutations: 'MSI_H',
-        cancer_type: 'CRC',
-        symptoms: 'abdominal pain, weight loss',
-        medications: '',
-        stage: 'Stage IV'
-    },
-    melanoma_braf: {
-        query: '41-year-old female, metastatic cutaneous melanoma, BRAF V600E mutation, treatment-naive. Assess targeted vs immunotherapy options.',
-        mutations: 'BRAF_V600E',
-        cancer_type: 'MELANOMA',
-        symptoms: 'growing skin lesion',
-        medications: '',
-        stage: 'Stage III'
-    }
+    nsclc_egfr: { query: '55-year-old male, Stage IV NSCLC, EGFR L858R mutation detected on NGS, currently on Osimertinib, presenting with new CNS metastases.', mutations: 'EGFR_L858R', cancer_type: 'NSCLC', symptoms: 'headache, vision changes', medications: '', stage: 'Stage IV' },
+    breast_her2: { query: '48-year-old female, HER2-positive metastatic breast cancer, progressed on Trastuzumab+Pertuzumab. Currently taking ketoconazole for fungal infection.', mutations: 'HER2_AMP', cancer_type: 'BREAST_CANCER', symptoms: 'fatigue, bone pain', medications: 'ketoconazole', stage: 'Stage IV' },
+    crc_msi: { query: '62-year-old male, metastatic colorectal cancer, MSI-High/dMMR confirmed. Failed FOLFOX. Evaluating immunotherapy options.', mutations: 'MSI_H', cancer_type: 'CRC', symptoms: 'abdominal pain, weight loss', medications: '', stage: 'Stage IV' },
+    melanoma_braf: { query: '41-year-old female, metastatic cutaneous melanoma, BRAF V600E mutation, treatment-naive. Assess targeted vs immunotherapy options.', mutations: 'BRAF_V600E', cancer_type: 'MELANOMA', symptoms: 'growing skin lesion', medications: '', stage: 'Stage III' }
 };
 
 function setupTumorBoardPanel() {
-    const tbRunBtn = document.getElementById('tb-run-btn');
-    tbRunBtn.addEventListener('click', runTumorBoard);
-
+    document.getElementById('tb-run-btn').addEventListener('click', runTumorBoard);
     document.querySelectorAll('.tb-preset-chip').forEach(chip => {
         chip.addEventListener('click', () => {
             const preset = TB_PRESETS[chip.getAttribute('data-preset')];
@@ -942,7 +1648,6 @@ function setupTumorBoardPanel() {
 async function runTumorBoard() {
     const query = document.getElementById('tb-query').value.trim();
     if (!query) { showToast('Enter a clinical question', 'error'); return; }
-
     const tbRunBtn = document.getElementById('tb-run-btn');
     tbRunBtn.disabled = true;
     tbRunBtn.textContent = 'Analyzing...';
@@ -954,16 +1659,10 @@ async function runTumorBoard() {
     try {
         const resp = await fetch(API_URL + '/tumor-board/analyze', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query,
-                mutations,
-                symptoms,
-                co_medications: coMeds,
-                cancer_type: document.getElementById('tb-cancer-type').value,
-                stage: document.getElementById('tb-stage').value
-            })
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ query, mutations, symptoms, co_medications: coMeds, cancer_type: document.getElementById('tb-cancer-type').value, stage: document.getElementById('tb-stage').value })
         });
+        if (resp.status === 403) { showToast('Tumor Board requires Enterprise plan.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         renderTumorBoardResults(data);
     } catch (e) {
@@ -976,96 +1675,55 @@ async function runTumorBoard() {
 
 function renderTumorBoardResults(data) {
     const container = document.getElementById('tb-results');
-
-    if (data.error) {
-        container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escapeHtml(data.error)}</p></div>`;
-        return;
-    }
-
+    if (data.error) { container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escapeHtml(data.error)}</p></div>`; return; }
     const AGENT_ICONS = {
         'Triage & Emergency Agent': { icon: '&#x1F6A8;', bg: 'rgba(248,113,113,.15)' },
         'Genomic & Biomarker Specialist Agent': { icon: '&#x1F9EC;', bg: 'rgba(52,211,153,.15)' },
         'Clinical Trial Matchmaker Agent': { icon: '&#x1F50D;', bg: 'rgba(129,140,248,.15)' },
         'Pharmacovigilance & Drug Interaction Agent': { icon: '&#x1F48A;', bg: 'rgba(251,191,36,.15)' },
     };
-
     let html = '';
-
-    // Agent cards
     (data.agent_reports || []).forEach(report => {
         const agentInfo = AGENT_ICONS[report.agent] || { icon: '&#x1F916;', bg: 'var(--glass-bg)' };
-        html += `<div class="agent-card">
-            <div class="agent-header">
-                <div class="agent-icon" style="background:${agentInfo.bg}">${agentInfo.icon}</div>
-                <div class="agent-name">${escapeHtml(report.agent)}</div>
-            </div>
-            <div class="agent-body">`;
-
+        html += `<div class="agent-card"><div class="agent-header"><div class="agent-icon" style="background:${agentInfo.bg}">${agentInfo.icon}</div><div class="agent-name">${escapeHtml(report.agent)}</div></div><div class="agent-body">`;
         if (report.agent.includes('Triage')) {
             const color = report.triage_level === 'RED' ? 'var(--danger)' : report.triage_level === 'YELLOW' ? 'var(--warning)' : 'var(--success)';
-            html += `<p><strong>Level:</strong> <span style="color:${color};font-weight:700">${escapeHtml(report.triage_level || 'GREEN')}</span> &mdash; ${escapeHtml(report.title || '')}</p>`;
-            html += `<p>${escapeHtml(report.action || '')}</p>`;
+            html += `<p><strong>Level:</strong> <span style="color:${color};font-weight:700">${escapeHtml(report.triage_level || 'GREEN')}</span> &mdash; ${escapeHtml(report.title || '')}</p><p>${escapeHtml(report.action || '')}</p>`;
         } else if (report.agent.includes('Genomic')) {
             html += `<p><strong>Mutations Detected:</strong> ${(report.mutations_detected || []).map(m => `<span class="rc-badge mutation">${escapeHtml(m.label || m.id)}</span>`).join(' ') || 'None'}</p>`;
-            if (report.therapies?.length > 0) {
-                html += '<ul>';
-                report.therapies.forEach(t => { html += `<li><strong>${escapeHtml(t.drug_label)}</strong> (${escapeHtml(t.drug_class)}) &mdash; ${escapeHtml(t.evidence)}</li>`; });
-                html += '</ul>';
-            }
+            if (report.therapies?.length > 0) { html += '<ul>'; report.therapies.forEach(t => { html += `<li><strong>${escapeHtml(t.drug_label)}</strong> (${escapeHtml(t.drug_class)}) &mdash; ${escapeHtml(t.evidence)}</li>`; }); html += '</ul>'; }
             html += `<p>${escapeHtml(report.recommendation || '')}</p>`;
         } else if (report.agent.includes('Trial')) {
             html += `<p><strong>Matched Trials:</strong> ${report.total_matches || 0}</p>`;
-            if (report.matched_trials?.length > 0) {
-                html += '<ul>';
-                report.matched_trials.forEach(t => { html += `<li><strong>${escapeHtml(t.nct_id)}</strong> &mdash; ${escapeHtml(t.title)} (${escapeHtml(t.phase)}, ${escapeHtml(t.status)})</li>`; });
-                html += '</ul>';
-            }
+            if (report.matched_trials?.length > 0) { html += '<ul>'; report.matched_trials.forEach(t => { html += `<li><strong>${escapeHtml(t.nct_id)}</strong> &mdash; ${escapeHtml(t.title)} (${escapeHtml(t.phase)}, ${escapeHtml(t.status)})</li>`; }); html += '</ul>'; }
         } else if (report.agent.includes('Pharmacovigilance')) {
             html += `<p><strong>Drug Interactions:</strong> ${report.interaction_count || 0}</p>`;
-            if (report.drug_interactions?.length > 0) {
-                html += '<ul>';
-                report.drug_interactions.forEach(i => { html += `<li><strong style="color:var(--danger)">${escapeHtml(i.risk)}</strong>: ${escapeHtml(i.drug)} + ${escapeHtml(i.co_medication)} (${escapeHtml(i.type)})</li>`; });
-                html += '</ul>';
-            }
-            if (report.known_toxicities?.length > 0) {
-                html += `<p><strong>Known Toxicities:</strong></p><ul>`;
-                report.known_toxicities.forEach(t => { html += `<li>${escapeHtml(t.toxicity_label)}</li>`; });
-                html += '</ul>';
-            }
+            if (report.drug_interactions?.length > 0) { html += '<ul>'; report.drug_interactions.forEach(i => { html += `<li><strong style="color:var(--danger)">${escapeHtml(i.risk)}</strong>: ${escapeHtml(i.drug)} + ${escapeHtml(i.co_medication)} (${escapeHtml(i.type)})</li>`; }); html += '</ul>'; }
+            if (report.known_toxicities?.length > 0) { html += `<p><strong>Known Toxicities:</strong></p><ul>`; report.known_toxicities.forEach(t => { html += `<li>${escapeHtml(t.toxicity_label)}</li>`; }); html += '</ul>'; }
             html += `<p>${escapeHtml(report.recommendation || '')}</p>`;
         }
-
         html += `</div></div>`;
     });
 
-    // Consensus
     if (data.consensus) {
         const c = data.consensus;
         const triageColor = c.triage_level === 'RED' ? 'red' : c.triage_level === 'YELLOW' ? 'yellow' : 'green';
-        html += `<div class="consensus-card">
-            <h3>&#x1F3AF; Tumor Board Consensus Report</h3>
-            <div class="consensus-grid">
-                <div class="consensus-metric"><span class="cm-value ${triageColor}">${escapeHtml(c.triage_level || 'GREEN')}</span><span class="cm-label">Triage Level</span></div>
-                <div class="consensus-metric"><span class="cm-value blue">${c.actionable_mutations || 0}</span><span class="cm-label">Mutations</span></div>
-                <div class="consensus-metric"><span class="cm-value green">${c.targeted_therapies_available || 0}</span><span class="cm-label">Therapies</span></div>
-                <div class="consensus-metric"><span class="cm-value blue">${c.eligible_clinical_trials || 0}</span><span class="cm-label">Clinical Trials</span></div>
-                <div class="consensus-metric"><span class="cm-value ${c.drug_interactions_detected > 0 ? 'red' : 'green'}">${c.drug_interactions_detected || 0}</span><span class="cm-label">Drug Interactions</span></div>
-            </div>
-            <div class="consensus-recommendation"><strong>Recommendation:</strong> ${escapeHtml(c.overall_recommendation || '')}</div>
-        </div>`;
+        html += `<div class="consensus-card"><h3>&#x1F3AF; Tumor Board Consensus Report</h3><div class="consensus-grid">
+            <div class="consensus-metric"><span class="cm-value ${triageColor}">${escapeHtml(c.triage_level || 'GREEN')}</span><span class="cm-label">Triage Level</span></div>
+            <div class="consensus-metric"><span class="cm-value blue">${c.actionable_mutations || 0}</span><span class="cm-label">Mutations</span></div>
+            <div class="consensus-metric"><span class="cm-value green">${c.targeted_therapies_available || 0}</span><span class="cm-label">Therapies</span></div>
+            <div class="consensus-metric"><span class="cm-value blue">${c.eligible_clinical_trials || 0}</span><span class="cm-label">Clinical Trials</span></div>
+            <div class="consensus-metric"><span class="cm-value ${c.drug_interactions_detected > 0 ? 'red' : 'green'}">${c.drug_interactions_detected || 0}</span><span class="cm-label">Drug Interactions</span></div>
+        </div><div class="consensus-recommendation"><strong>Recommendation:</strong> ${escapeHtml(c.overall_recommendation || '')}</div></div>`;
     }
-
-    if (data.latency) {
-        html += `<div class="metrics" style="margin-top:12px"><span class="metric-item">&#x23F1;&#xFE0F; Analysis: ${data.latency.toFixed(3)}s</span></div>`;
-    }
-
+    if (data.latency) html += `<div class="metrics" style="margin-top:12px"><span class="metric-item">&#x23F1;&#xFE0F; Analysis: ${data.latency.toFixed(3)}s</span></div>`;
     container.innerHTML = html;
 }
 
 
-// =============================================
+// ═══════════════════════════════════════════════════════
 // FEDERATED LEARNING PANEL
-// =============================================
+// ═══════════════════════════════════════════════════════
 function setupFederatedPanel() {
     document.getElementById('fed-run-btn').addEventListener('click', runFederatedTraining);
     document.getElementById('fed-status-btn').addEventListener('click', loadFederatedStatus);
@@ -1074,28 +1732,22 @@ function setupFederatedPanel() {
 
 async function loadFederatedStatus() {
     try {
-        const resp = await fetch(API_URL + '/federated/status');
+        const resp = await fetch(API_URL + '/federated/status', { headers: getAuthHeaders() });
         if (!resp.ok) return;
         const data = await resp.json();
         renderHospitalCards(data.hospitals || []);
-    } catch (e) {
-        console.log('Federated status not available');
-    }
+    } catch { console.log('Federated status not available'); }
 }
 
 function renderHospitalCards(hospitals) {
     const container = document.getElementById('fed-hospitals');
     const HOSPITAL_COLORS = ['rgba(129,140,248,.15)', 'rgba(52,211,153,.15)', 'rgba(251,191,36,.15)'];
     const HOSPITAL_ICONS = ['&#x1F3E5;', '&#x1F3EB;', '&#x1F3E8;'];
-
     container.innerHTML = hospitals.map((h, i) => `
         <div class="hospital-card">
             <div class="hc-header">
                 <div class="hc-icon" style="background:${HOSPITAL_COLORS[i % 3]}">${HOSPITAL_ICONS[i % 3]}</div>
-                <div>
-                    <div class="hc-name">${escapeHtml(h.name)}</div>
-                    <div class="hc-focus">${escapeHtml(h.focus)}</div>
-                </div>
+                <div><div class="hc-name">${escapeHtml(h.name)}</div><div class="hc-focus">${escapeHtml(h.focus)}</div></div>
             </div>
             <div class="hc-stats">
                 <div class="hc-stat"><span class="hc-stat-value">${h.samples?.toLocaleString() || '0'}</span><span class="hc-stat-label">Samples</span></div>
@@ -1111,181 +1763,45 @@ async function runFederatedTraining() {
     const fedRunBtn = document.getElementById('fed-run-btn');
     fedRunBtn.disabled = true;
     fedRunBtn.textContent = 'Training...';
-
     const nRounds = parseInt(document.getElementById('fed-rounds').value) || 3;
     const localEpochs = parseInt(document.getElementById('fed-epochs').value) || 5;
-
     try {
         const resp = await fetch(API_URL + '/federated/train', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ n_rounds: nRounds, local_epochs: localEpochs })
         });
+        if (resp.status === 403) { showToast('Federated Learning requires Enterprise plan.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         renderFederatedResults(data);
-        // Update hospital cards
         if (data.hospitals) renderHospitalCards(data.hospitals);
-    } catch (e) {
-        document.getElementById('fed-results').innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Failed to run federated training</p></div>`;
-    } finally {
-        fedRunBtn.disabled = false;
-        fedRunBtn.innerHTML = '&#x1F680; Launch Federated Training';
-    }
+    } catch { document.getElementById('fed-results').innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Failed to run federated training</p></div>`; }
+    finally { fedRunBtn.disabled = false; fedRunBtn.innerHTML = '&#x1F680; Launch Federated Training'; }
 }
 
 function renderFederatedResults(data) {
     const container = document.getElementById('fed-results');
-
-    if (data.error) {
-        container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escapeHtml(data.error)}</p></div>`;
-        return;
-    }
-
-    let html = `<div style="margin-bottom:16px;font-size:.85rem;color:var(--text-muted)">
-        <strong>Completed:</strong> ${data.total_rounds} rounds | <strong>Time:</strong> ${data.total_training_time_seconds}s | <strong>Status:</strong> <span style="color:var(--success)">${escapeHtml(data.status || 'COMPLETE')}</span>
-    </div>`;
-
-    // Round summaries
+    if (data.error) { container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">${escapeHtml(data.error)}</p></div>`; return; }
+    let html = `<div style="margin-bottom:16px;font-size:.85rem;color:var(--text-muted)"><strong>Completed:</strong> ${data.total_rounds} rounds | <strong>Time:</strong> ${data.total_training_time_seconds}s | <strong>Status:</strong> <span style="color:var(--success)">${escapeHtml(data.status || 'COMPLETE')}</span></div>`;
     (data.rounds || []).forEach(round => {
-        html += `<div class="training-round">
-            <div class="tr-header">Round ${round.round} of ${data.total_rounds}</div>
-            <div class="tr-body">
-                ${(round.hospital_reports || []).map(hr => `
-                    <div>
-                        <strong>${escapeHtml(hr.hospital_name)}</strong><br>
-                        Loss: ${hr.loss_start?.toFixed(4)} → ${hr.loss_end?.toFixed(4)} (↓${hr.loss_improvement}%)
-                    </div>
-                `).join('')}
-            </div>
-        </div>`;
+        html += `<div class="training-round"><div class="tr-header">Round ${round.round} of ${data.total_rounds}</div><div class="tr-body">${(round.hospital_reports || []).map(hr => `<div><strong>${escapeHtml(hr.hospital_name)}</strong><br>Loss: ${hr.loss_start?.toFixed(4)} → ${hr.loss_end?.toFixed(4)} (↓${hr.loss_improvement}%)</div>`).join('')}</div></div>`;
     });
-
     html += `<div class="privacy-badge">&#x1F512; ${escapeHtml(data.privacy_guarantee || 'No patient data was exchanged between hospital nodes.')}</div>`;
-
     container.innerHTML = html;
 }
 
 
-}
-
-
-// =============================================
-// USER AUTHENTICATION SYSTEM
-// =============================================
-function setupAuth() {
-    const authOverlay = document.getElementById('auth-overlay');
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
-    const goToRegister = document.getElementById('go-to-register');
-    const goToLogin = document.getElementById('go-to-login');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    // Check login state
-    const token = localStorage.getItem('cancerAI_token');
-    const userJson = localStorage.getItem('cancerAI_user');
-    if (token && userJson) {
-        authOverlay.classList.remove('active');
-        const user = JSON.parse(userJson);
-        showToast(`Authenticated as ${user.username}`, 'success');
-    } else {
-        authOverlay.classList.add('active');
-    }
-
-    // Toggle forms
-    goToRegister.addEventListener('click', (e) => {
-        e.preventDefault();
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
-    });
-    goToLogin.addEventListener('click', (e) => {
-        e.preventDefault();
-        registerForm.style.display = 'none';
-        loginForm.style.display = 'block';
-    });
-
-    // Login submit
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('login-username').value.trim();
-        const password = document.getElementById('login-password').value;
-
-        try {
-            const resp = await fetch(API_URL + '/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const data = await resp.json();
-            if (data.success) {
-                localStorage.setItem('cancerAI_token', data.token);
-                localStorage.setItem('cancerAI_user', JSON.stringify(data.user));
-                authOverlay.classList.remove('active');
-                showToast(data.message, 'success');
-                loadGraphStats(); // load graph after login
-            } else {
-                showToast(data.message, 'error');
-            }
-        } catch (err) {
-            showToast('Authentication connection failed.', 'error');
-        }
-    });
-
-    // Register submit
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('reg-username').value.trim();
-        const email = document.getElementById('reg-email').value.trim();
-        const password = document.getElementById('reg-password').value;
-
-        try {
-            const resp = await fetch(API_URL + '/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password })
-            });
-            const data = await resp.json();
-            if (data.success) {
-                showToast(data.message + ' Please sign in.', 'success');
-                registerForm.style.display = 'none';
-                loginForm.style.display = 'block';
-            } else {
-                showToast(data.message, 'error');
-            }
-        } catch (err) {
-            showToast('Registration connection failed.', 'error');
-        }
-    });
-
-    // Logout click
-    logoutBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to log out from this clinical node?')) {
-            localStorage.removeItem('cancerAI_token');
-            localStorage.removeItem('cancerAI_user');
-            authOverlay.classList.add('active');
-            // reset forms
-            document.getElementById('login-username').value = '';
-            document.getElementById('login-password').value = '';
-            registerForm.style.display = 'none';
-            loginForm.style.display = 'block';
-            showToast('Logged out successfully', 'info');
-        }
-    });
-}
-
-
-// =============================================
-// CLINICAL ML PROGNOSIS EXPLORER
-// =============================================
+// ═══════════════════════════════════════════════════════
+// ML PROGNOSIS PANEL
+// ═══════════════════════════════════════════════════════
 function setupMLPanel() {
-    const predictBtn = document.getElementById('ml-predict-btn');
-    predictBtn.addEventListener('click', runMLPrediction);
+    document.getElementById('ml-predict-btn').addEventListener('click', runMLPrediction);
 }
 
 async function runMLPrediction() {
     const predictBtn = document.getElementById('ml-predict-btn');
     predictBtn.disabled = true;
     predictBtn.textContent = 'Running ML inference...';
-
     const age = parseInt(document.getElementById('ml-age').value) || 55;
     const tumorSize = parseFloat(document.getElementById('ml-tumor-size').value) || 3.5;
     const lymphNodes = parseInt(document.getElementById('ml-lymph-nodes').value) || 0;
@@ -1295,79 +1811,46 @@ async function runMLPrediction() {
     try {
         const resp = await fetch(API_URL + '/diagnostics/predict', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                age,
-                tumor_size: tumorSize,
-                lymph_nodes: lymphNodes,
-                biomarker_id: biomarkerId,
-                symptom_count: symptomCount
-            })
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ age, tumor_size: tumorSize, lymph_nodes: lymphNodes, biomarker_id: biomarkerId, symptom_count: symptomCount })
         });
+        if (resp.status === 403) { showToast('ML Prognosis requires Clinical plan.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         if (data.success && data.results) {
             renderMLResults(data.results);
         } else {
             showToast(data.message || 'ML Prediction failed', 'error');
         }
-    } catch (e) {
-        document.getElementById('ml-results').innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Failed to run ML prediction. Check API connection.</p></div>`;
-    } finally {
-        predictBtn.disabled = false;
-        predictBtn.innerHTML = '&#x1F5A5;&#xFE0F; Run Prognosis Prediction';
-    }
+    } catch { document.getElementById('ml-results').innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Failed to run ML prediction. Check API connection.</p></div>`; }
+    finally { predictBtn.disabled = false; predictBtn.innerHTML = '&#x1F5A5;&#xFE0F; Run Prognosis Prediction'; }
 }
 
 function renderMLResults(res) {
     const container = document.getElementById('ml-results');
-    
     let html = `
         <div class="ml-results-grid">
-            <!-- Staging Risk Probability -->
             <div class="ml-card-result">
                 <h3>&#x1F4CA; Random Forest Malignancy Probability</h3>
-                
-                <div class="ml-prob-bar">
-                    <div class="ml-prob-row"><span>Low Risk / Benign</span><strong>${res.probabilities.low.toFixed(1)}%</strong></div>
-                    <div class="ml-prob-track"><div class="ml-prob-fill low" style="width: ${res.probabilities.low}%"></div></div>
-                </div>
-
-                <div class="ml-prob-bar">
-                    <div class="ml-prob-row"><span>Moderate Risk / Localized</span><strong>${res.probabilities.moderate.toFixed(1)}%</strong></div>
-                    <div class="ml-prob-track"><div class="ml-prob-fill moderate" style="width: ${res.probabilities.moderate}%"></div></div>
-                </div>
-
-                <div class="ml-prob-bar">
-                    <div class="ml-prob-row"><span>High Risk / Metastatic</span><strong>${res.probabilities.high.toFixed(1)}%</strong></div>
-                    <div class="ml-prob-track"><div class="ml-prob-fill high" style="width: ${res.probabilities.high}%"></div></div>
-                </div>
-
+                <div class="ml-prob-bar"><div class="ml-prob-row"><span>Low Risk / Benign</span><strong>${res.probabilities.low.toFixed(1)}%</strong></div><div class="ml-prob-track"><div class="ml-prob-fill low" style="width: ${res.probabilities.low}%"></div></div></div>
+                <div class="ml-prob-bar"><div class="ml-prob-row"><span>Moderate Risk / Localized</span><strong>${res.probabilities.moderate.toFixed(1)}%</strong></div><div class="ml-prob-track"><div class="ml-prob-fill moderate" style="width: ${res.probabilities.moderate}%"></div></div></div>
+                <div class="ml-prob-bar"><div class="ml-prob-row"><span>High Risk / Metastatic</span><strong>${res.probabilities.high.toFixed(1)}%</strong></div><div class="ml-prob-track"><div class="ml-prob-fill high" style="width: ${res.probabilities.high}%"></div></div></div>
                 <div class="consensus-recommendation" style="margin-top:16px; border-left: 4px solid var(--${res.color_theme}); padding: 8px 12px; background: rgba(255,255,255,0.02);">
                     <strong>Risk Classification:</strong> <span style="text-transform: uppercase; font-weight:700; color: var(--${res.color_theme})">${res.prediction_label}</span><br>
                     <p style="font-size:0.8rem; margin-top:4px; line-height:1.4;">${escapeHtml(res.clinical_notes)}</p>
                 </div>
             </div>
-
-            <!-- Feature Importance -->
             <div class="ml-card-result">
                 <h3>&#x1F525; Local Gini Feature Importance</h3>
-                
                 ${Object.entries(res.feature_importance).map(([feature, val]) => `
                     <div class="ml-fi-item">
                         <div class="ml-fi-label">${escapeHtml(feature)}</div>
-                        <div class="ml-fi-bar-container">
-                            <div class="ml-fi-bar"><div class="ml-fi-fill" style="width: ${val}%"></div></div>
-                            <span class="ml-fi-value">${val.toFixed(1)}%</span>
-                        </div>
+                        <div class="ml-fi-bar-container"><div class="ml-fi-bar"><div class="ml-fi-fill" style="width: ${val}%"></div></div><span class="ml-fi-value">${val.toFixed(1)}%</span></div>
                     </div>
                 `).join('')}
             </div>
-        </div>
-    `;
-
+        </div>`;
     container.innerHTML = html;
 }
-
 
 // ===== BOOT =====
 init();

@@ -6,3 +6,6 @@ groq
 python-dotenv
 networkx
 numpy
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
