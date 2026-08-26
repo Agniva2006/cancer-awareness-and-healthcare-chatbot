@@ -12,7 +12,7 @@ import time
 import logging
 from datetime import datetime, timedelta
 
-from app.rag import retrieve
+from app.rag import retrieve, hybrid_retrieve
 from app.prompts import build_prompt
 from app.model import generate
 from app.safety import is_risky, safe_response
@@ -130,6 +130,21 @@ class GraphTraverseRequest(BaseModel):
 class FederatedTrainRequest(BaseModel):
     n_rounds: Optional[int] = 3
     local_epochs: Optional[int] = 5
+
+
+class FederatedDPTrainRequest(BaseModel):
+    n_rounds: Optional[int] = 3
+    local_epochs: Optional[int] = 3
+    clip_norm: Optional[float] = 1.0
+    noise_multiplier: Optional[float] = 1.2
+    delta: Optional[float] = 1e-5
+
+
+class HybridQueryRequest(BaseModel):
+    query: str
+    k: Optional[int] = 5
+    rrf_k: Optional[int] = 60
+    category_filter: Optional[str] = None
 
 
 class ImagingRequest(BaseModel):
@@ -613,6 +628,88 @@ async def federated_train(request: FederatedTrainRequest, current_user: dict = D
         return result
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.post("/federated/train-dp")
+async def federated_train_dp(request: FederatedDPTrainRequest, current_user: dict = Depends(get_current_user)):
+    """Execute DP-SGD Federated Training with L2 clipping, Gaussian noise, and RDP budget tracking."""
+    plan = current_user.get("plan", "free")
+    if not PLANS.get(plan, {}).get("features", {}).get("federated", False):
+        raise HTTPException(status_code=403, detail="Federated Learning requires Enterprise plan.")
+    start_time = time.time()
+    try:
+        result = federated_server.run_full_dp_training(
+            n_rounds=min(request.n_rounds, 10),
+            local_epochs=min(request.local_epochs, 10),
+            clip_norm=request.clip_norm or 1.0,
+            noise_multiplier=request.noise_multiplier or 1.2,
+            delta=request.delta or 1e-5
+        )
+        result["api_latency"] = round(time.time() - start_time, 3)
+        record_api_call(current_user["username"], "/federated/train-dp")
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ──────────────────────────────────────────────
+# Tri-Store Hybrid GraphRAG (Reciprocal Rank Fusion)
+# ──────────────────────────────────────────────
+
+@app.post("/rag/hybrid-query")
+async def rag_hybrid_query(request: HybridQueryRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Execute Tri-Store Hybrid GraphRAG query with Reciprocal Rank Fusion (RRF).
+    Fuses Dense semantic vector similarity, Sparse BM25-style lexical tokens, and Knowledge Graph paths.
+    """
+    start_time = time.time()
+    try:
+        results = hybrid_retrieve(
+            query=request.query,
+            k=min(request.k or 5, 20),
+            rrf_k=request.rrf_k or 60,
+            category_filter=request.category_filter
+        )
+        latency = round(time.time() - start_time, 4)
+        return {
+            "query": request.query,
+            "count": len(results),
+            "results": results,
+            "fusion_algorithm": "Reciprocal Rank Fusion (k=60)",
+            "stores": ["Dense Vector Embeddings", "Sparse Lexical Index", "NetworkX Clinical Knowledge Graph"],
+            "latency_seconds": latency,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/system/mlsys-metrics")
+async def get_mlsys_metrics():
+    """MLSys performance benchmarks, P99 SLA targets, and privacy telemetry."""
+    return {
+        "status": "OPERATIONAL",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "federated_learning": {
+            "algorithm": "Asynchronous Staleness-Discounted FedAvg + DP-SGD",
+            "active_hospital_nodes": len(federated_server.hospitals),
+            "cumulative_epsilon": federated_server.cumulative_epsilon,
+            "target_epsilon_budget": 1.20,
+            "delta": 1e-5,
+            "gradient_clipping_L2": 1.0,
+            "gaussian_noise_sigma": 1.2,
+        },
+        "retrieval_engine": {
+            "architecture": "Tri-Store Hybrid GraphRAG",
+            "fusion_method": "Reciprocal Rank Fusion (RRF, k=60)",
+            "knowledge_graph_entities": knowledge_graph.G.number_of_nodes(),
+            "knowledge_graph_relations": knowledge_graph.G.number_of_edges(),
+        },
+        "sla_targets": {
+            "triage_p99_latency_ms": 25.0,
+            "hybrid_rag_p99_latency_ms": 45.0,
+            "tumor_board_consensus_p99_ms": 1200.0,
+        }
+    }
 
 
 # ──────────────────────────────────────────────

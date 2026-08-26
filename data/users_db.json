@@ -15,5 +15,35 @@
     "usage_monthly": {},
     "activity": [],
     "sessions": []
+  },
+  "test_oncologist": {
+    "password": "$2b$12$Khh5i/LpibcmHsC66HHDaO6g5rsES8.L5DEApVFtHNi1xMmxav8w6",
+    "email": "test@oncology.org",
+    "full_name": "",
+    "specialty": "",
+    "institution": "",
+    "role": "clinician",
+    "plan": "free",
+    "avatar_color": "#6366f1",
+    "created_at": "2026-08-26T20:44:18.843023Z",
+    "last_login": "2026-08-26T20:54:52.433399Z",
+    "onboarding_done": false,
+    "usage_daily": {},
+    "usage_monthly": {},
+    "activity": [],
+    "sessions": [
+      {
+        "login_at": "2026-08-26T20:44:19.087582Z",
+        "ts": 1787777059.0875828
+      },
+      {
+        "login_at": "2026-08-26T20:44:54.146709Z",
+        "ts": 1787777094.1467092
+      },
+      {
+        "login_at": "2026-08-26T20:54:52.433399Z",
+        "ts": 1787777692.4333994
+      }
+    ]
   }
 }
