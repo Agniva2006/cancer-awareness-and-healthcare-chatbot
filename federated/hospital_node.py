@@ -127,25 +127,25 @@ class HospitalNode:
         self.training_loss_history.extend(losses)
         self.training_rounds += 1
 
-        avg_pre_clip = round(total_pre_clip_norm / epochs, 4)
-        avg_post_clip = round(total_post_clip_norm / epochs, 4)
+        avg_pre_clip = round(float(total_pre_clip_norm / epochs), 4)
+        avg_post_clip = round(float(total_post_clip_norm / epochs), 4)
 
         return {
             "hospital_id": self.hospital_id,
             "hospital_name": self.name,
             "cancer_focus": self.cancer_focus,
-            "n_samples": self.n_samples,
-            "rounds_completed": self.training_rounds,
-            "local_epochs": epochs,
-            "loss_start": losses[0],
-            "loss_end": losses[-1],
-            "loss_improvement": round((losses[0] - losses[-1]) / losses[0] * 100, 2),
+            "n_samples": int(self.n_samples),
+            "rounds_completed": int(self.training_rounds),
+            "local_epochs": int(epochs),
+            "loss_start": float(losses[0]),
+            "loss_end": float(losses[-1]),
+            "loss_improvement": round(float((losses[0] - losses[-1]) / losses[0] * 100), 2),
             "dp_metrics": {
-                "clip_norm_threshold": clip_norm,
-                "noise_multiplier_sigma": noise_multiplier,
+                "clip_norm_threshold": float(clip_norm),
+                "noise_multiplier_sigma": float(noise_multiplier),
                 "avg_gradient_l2_norm_pre_clip": avg_pre_clip,
                 "avg_gradient_l2_norm_post_clip": avg_post_clip,
-                "clipping_applied": avg_pre_clip > clip_norm,
+                "clipping_applied": bool(avg_pre_clip > clip_norm),
             }
         }
 
@@ -312,9 +312,9 @@ class FederatedServer:
                 "clip_norm_threshold": clip_norm,
                 "noise_multiplier_sigma": noise_multiplier,
                 "delta_target": delta,
-                "cumulative_epsilon_consumed": current_eps,
+                "cumulative_epsilon_consumed": float(current_eps),
                 "epsilon_budget_max": 1.20,
-                "privacy_guaranteed": current_eps <= 1.20,
+                "privacy_guaranteed": bool(current_eps <= 1.20),
             }
         }
 
