@@ -9,7 +9,7 @@ An enterprise-grade, multi-modal clinical decision support workstation designed 
 ## 🌐 Live Deployments
 
 * **Enterprise Client Dashboard (Vercel):** [https://cancer-awareness-and-healthcare-cha.vercel.app/](https://cancer-awareness-and-healthcare-cha.vercel.app/)
-* **Clinical Intelligence API (Render):** [https://cancer-awareness-and-healthcare-chatbot-b7za.onrender.com/docs](https://cancer-awareness-and-healthcare-chatbot-b7za.onrender.com/docs)
+* **Clinical Intelligence API (Render):** [https://cancer-awareness-and-healthcare-chatbot-n2wy.onrender.com/docs](https://cancer-awareness-and-healthcare-chatbot-n2wy.onrender.com/docs)
 
 ---
 

@@ -1,7 +1,7 @@
 // ===== CONFIGURATION =====
 const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? "http://localhost:8000"
-    : (window.location.origin.includes('onrender.com') ? window.location.origin : "https://cancer-awareness-and-healthcare-chatbot-b7za.onrender.com");
+    : (window.location.origin.includes('onrender.com') ? window.location.origin : "https://cancer-awareness-and-healthcare-chatbot-n2wy.onrender.com");
 const MAX_CHARS = 500;
 
 // ===== DOM REFERENCES =====
