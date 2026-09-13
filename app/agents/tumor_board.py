@@ -337,3 +337,26 @@ class TumorBoardOrchestrator:
             parts.append(f"WARNING: {n_interactions} significant drug interaction(s) detected. Review co-medications.")
 
         return " ".join(parts) if parts else "Standard care pathway recommended."
+
+    def deliberate(self, patient_case: Dict[str, Any]) -> Dict[str, Any]:
+        """Convenience method for multi-agent deliberation."""
+        ctx = {
+            "query": patient_case.get("query", ""),
+            "mutations": patient_case.get("biomarkers", []),
+            "cancer_type": patient_case.get("cancer_type", "NSCLC"),
+            "stage": patient_case.get("stage", "Stage IV"),
+            "symptoms": patient_case.get("symptoms", []),
+            "co_medications": patient_case.get("co_medications", [])
+        }
+        res = self.run_tumor_board(ctx)
+        return {
+            "consensus_recommendation": res["consensus"].get("overall_recommendation", "Standard care pathway recommended."),
+            "targeted_therapies_available": res["consensus"].get("targeted_therapies_available", 0),
+            "eligible_clinical_trials": res["consensus"].get("eligible_clinical_trials", 0),
+            "agent_reports": res.get("agent_reports", [])
+        }
+
+
+# Singleton instance
+tumor_board_agent = TumorBoardOrchestrator()
+
