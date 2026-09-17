@@ -2,7 +2,8 @@
 
 An enterprise-grade, multi-modal clinical decision support workstation designed for oncologists, molecular pathologists, and clinical trials networks. The platform integrates a relational **Knowledge Graph Engine**, a **Virtual Tumor Board Swarm**, **Federated Learning Simulations**, and a **DICOM/Pathology Visual Diagnostic Engine** into a stunning, responsive, glassmorphism-styled workspace.
 
-![OncoGraph AI Dashboard](frontend/images/general.png)
+<img width="6062" height="5278" alt="diagram_chatbot" src="https://github.com/user-attachments/assets/80bdd4d0-ac4e-4bf3-a6ad-afb1bb01b108" />
+
 
 ---
 
