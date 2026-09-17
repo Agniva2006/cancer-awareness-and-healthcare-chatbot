@@ -45,5 +45,52 @@
         "ts": 1787777692.4333994
       }
     ]
+  },
+  "doctor_9228": {
+    "password": "$2b$12$Gj5mWIq.Gnj6wZi4RDJQveJ7XFQYQd1/R1KlzWfVxEim7xPMGp8Ge",
+    "email": "dr_9228@hospital.org",
+    "full_name": "Dr. Agniva Ghosh",
+    "specialty": "Medical Oncology",
+    "institution": "Clinical AI Labs",
+    "role": "clinician",
+    "plan": "enterprise",
+    "avatar_color": "#14b8a6",
+    "created_at": "2026-09-17T17:52:01.175253Z",
+    "last_login": "2026-09-17T17:52:01.413016Z",
+    "onboarding_done": false,
+    "usage_daily": {
+      "2026-09-17": 4
+    },
+    "usage_monthly": {
+      "2026-09": 4
+    },
+    "activity": [
+      {
+        "endpoint": "/ask",
+        "timestamp": "2026-09-17T17:52:01.451140Z",
+        "ts": 1789667521.4511409
+      },
+      {
+        "endpoint": "/tumor-board/analyze",
+        "timestamp": "2026-09-17T17:52:01.482607Z",
+        "ts": 1789667521.4826078
+      },
+      {
+        "endpoint": "/federated/train-dp",
+        "timestamp": "2026-09-17T17:52:01.511901Z",
+        "ts": 1789667521.5119016
+      },
+      {
+        "endpoint": "/diagnostics/predict",
+        "timestamp": "2026-09-17T17:52:01.540975Z",
+        "ts": 1789667521.5409758
+      }
+    ],
+    "sessions": [
+      {
+        "login_at": "2026-09-17T17:52:01.413016Z",
+        "ts": 1789667521.4130163
+      }
+    ]
   }
 }
