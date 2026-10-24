@@ -156,13 +156,23 @@ function setupAuth() {
     if (savedToken && savedUser && !isTokenExpired(savedToken)) {
         authToken = savedToken;
         currentUser = JSON.parse(savedUser);
-        authOverlay.classList.remove('active');
+        if (authOverlay) authOverlay.classList.remove('active');
         onLoginSuccess(currentUser, false);
     } else {
         localStorage.removeItem('onco_token');
         localStorage.removeItem('onco_user');
-        authOverlay.classList.add('active');
+        if (authOverlay) authOverlay.classList.remove('active'); // Never block screen on startup
+        updateHeaderAuthButton(null);
     }
+
+    window.openAuthModal = function() {
+        const overlay = document.getElementById('auth-overlay');
+        if (overlay) overlay.classList.add('active');
+    };
+    window.closeAuthModal = function() {
+        const overlay = document.getElementById('auth-overlay');
+        if (overlay) overlay.classList.remove('active');
+    };
 
     async function performLogin(username, password, rememberMe = true) {
         setAuthMsg('', '');
@@ -186,8 +196,8 @@ function setupAuth() {
                 currentUser = data.user;
                 localStorage.setItem('onco_token', authToken);
                 localStorage.setItem('onco_user', JSON.stringify(currentUser));
-                authOverlay.classList.remove('active');
-                onLoginSuccess(currentUser, !currentUser.onboarding_done);
+                if (authOverlay) authOverlay.classList.remove('active');
+                onLoginSuccess(currentUser, false);
             } else {
                 setAuthMsg(data.detail || data.message || 'Login failed. Please verify credentials.', 'error');
             }
@@ -294,17 +304,30 @@ function setupAuth() {
     }
 }
 
-function onLoginSuccess(user, showOnboarding = false) {
+function updateHeaderAuthButton(user) {
+    const btn = document.getElementById('header-auth-btn');
+    const label = document.getElementById('header-auth-label');
+    const icon = document.getElementById('header-auth-icon');
+    if (!btn || !label) return;
+    if (user) {
+        label.textContent = (user.full_name ? user.full_name.split(' ')[0] : user.username) || 'Clinician';
+        if (icon) icon.textContent = '👤';
+        btn.onclick = () => openProfileModal();
+    } else {
+        label.textContent = 'Sign In';
+        if (icon) icon.textContent = '🔑';
+        btn.onclick = () => window.openAuthModal();
+    }
+}
+
+function onLoginSuccess(user) {
     scheduleTokenExpiryCheck();
     renderUserChip(user);
+    updateHeaderAuthButton(user);
     updatePlanGates(user.plan || 'free');
     refreshUsageBar();
     loadGraphStats();
     showToast(`Welcome${user.full_name ? ', ' + user.full_name.split(' ')[0] : ''}! You're on the ${capitalise(user.plan || 'free')} plan.`, 'success');
-
-    if (showOnboarding) {
-        setTimeout(() => openOnboarding(), 400);
-    }
 }
 
 function doLogout() {
@@ -312,12 +335,17 @@ function doLogout() {
     currentUser = null;
     localStorage.removeItem('onco_token');
     localStorage.removeItem('onco_user');
-    document.getElementById('auth-overlay').classList.add('active');
-    document.getElementById('login-form').reset();
-    document.getElementById('register-form').reset();
-    document.getElementById('user-chip-btn').style.display = 'none';
-    document.getElementById('sidebar-usage-bar').style.display = 'none';
-    document.getElementById('upgrade-nudge').style.display = 'none';
+    const authOverlay = document.getElementById('auth-overlay');
+    if (authOverlay) authOverlay.classList.remove('active');
+    updateHeaderAuthButton(null);
+    document.getElementById('login-form')?.reset();
+    document.getElementById('register-form')?.reset();
+    const userChip = document.getElementById('user-chip-btn');
+    if (userChip) userChip.style.display = 'none';
+    const usageBar = document.getElementById('sidebar-usage-bar');
+    if (usageBar) usageBar.style.display = 'none';
+    const nudge = document.getElementById('upgrade-nudge');
+    if (nudge) nudge.style.display = 'none';
     updatePlanGates('free');
     showToast('Logged out successfully', 'info');
 }
@@ -761,76 +789,17 @@ window.selectPlan = async function(planId) {
 };
 
 // ══════════════════════════════════════════════════════
-// ONBOARDING WIZARD
+// ONBOARDING STUBS (CLEAN ACCESS)
 // ══════════════════════════════════════════════════════
-
-let obStep = 0;
-let obRole = '';
-let obFocus = '';
-let obQuery = '';
-
-function openOnboarding() {
-    document.getElementById('onboarding-overlay').classList.add('active');
-    obStep = 0;
-    renderObStep();
-}
-
-function closeOnboarding() {
-    document.getElementById('onboarding-overlay').classList.remove('active');
-}
-
-function renderObStep() {
-    [0, 1, 2].forEach(i => {
-        document.getElementById('ob-step-' + i).classList.toggle('active', i === obStep);
-        const dot = document.getElementById('ob-dot-' + i);
-        dot.classList.toggle('active', i === obStep);
-        dot.classList.toggle('done', i < obStep);
-    });
-}
-
-window.selectObOption = function(el, type) {
-    el.closest('.ob-options-grid').querySelectorAll('.ob-option').forEach(o => o.classList.remove('selected'));
-    el.classList.add('selected');
-    if (type === 'role') obRole = el.getAttribute('data-ob-role');
-    if (type === 'focus') obFocus = el.getAttribute('data-ob-focus');
+window.openOnboarding = function() {};
+window.closeOnboarding = function() {};
+window.finishOnboarding = function() {
+    switchPanel('chat-panel');
 };
-
-window.selectObChip = function(el) {
-    el.closest('.ob-sample-chips').querySelectorAll('.ob-chip').forEach(c => c.classList.remove('selected'));
-    el.classList.add('selected');
-    obQuery = el.getAttribute('data-query');
-};
-
-window.obNext = function() {
-    if (obStep < 2) { obStep++; renderObStep(); }
-};
-
-window.obBack = function() {
-    if (obStep > 0) { obStep--; renderObStep(); }
-};
-
-window.finishOnboarding = async function() {
-    closeOnboarding();
-    // Mark onboarding done
-    if (authToken) {
-        try {
-            await fetch(API_URL + '/auth/onboarding-complete', {
-                method: 'POST',
-                headers: getAuthHeaders()
-            });
-        } catch {}
-    }
-    if (currentUser) currentUser.onboarding_done = true;
-
-    // Auto-fire selected query
-    if (obQuery) {
-        switchPanel('chat-panel');
-        setTimeout(() => {
-            userInput.value = obQuery;
-            chatForm.dispatchEvent(new Event('submit'));
-        }, 300);
-    }
-};
+window.selectObOption = function() {};
+window.selectObChip = function() {};
+window.obNext = function() {};
+window.obBack = function() {};
 
 // ══════════════════════════════════════════════════════
 // PASSWORD STRENGTH METER
@@ -1000,7 +969,7 @@ function setupTextareaAutoResize() {
     userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            chatForm.dispatchEvent(new Event('submit'));
+            submitChatMessage();
         }
     });
 }
@@ -1220,21 +1189,13 @@ function formatBotResponse(data) {
     return html;
 }
 
-// ===== FORM SUBMIT =====
-chatForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const query = userInput.value.trim();
+// ===== SUBMIT CHAT MESSAGE =====
+window.submitChatMessage = async function(queryOverride) {
+    const query = (queryOverride !== undefined ? queryOverride : userInput.value).trim();
     if (!query) return;
 
-    // Require auth
-    if (!authToken) {
-        showToast('Please log in to send queries.', 'error');
-        document.getElementById('auth-overlay').classList.add('active');
-        return;
-    }
-
     userMessageCount++;
-    if (userMessageCount >= 1) suggestionsOverlay.classList.add('hidden');
+    if (userMessageCount >= 1 && suggestionsOverlay) suggestionsOverlay.classList.add('hidden');
 
     let imagePayload = null;
     let userHtml = `<p>${escapeHtml(query)}</p>`;
@@ -1242,7 +1203,7 @@ chatForm.addEventListener('submit', async (e) => {
         imagePayload = pendingImageDataUrl;
         userHtml += `<div class="user-attached-image" onclick="openLightbox('${pendingImageDataUrl}')"><img src="${pendingImageDataUrl}" alt="Attached image"></div>`;
         pendingImageDataUrl = null;
-        imagePreviewContainer.classList.remove('active');
+        if (imagePreviewContainer) imagePreviewContainer.classList.remove('active');
     }
     appendMessage('user', userHtml);
 
@@ -1254,8 +1215,8 @@ chatForm.addEventListener('submit', async (e) => {
 
     userInput.value = '';
     userInput.style.height = 'auto';
-    charCount.textContent = `0 / ${MAX_CHARS}`;
-    sendBtn.disabled = true;
+    if (charCount) charCount.textContent = `0 / ${MAX_CHARS}`;
+    if (sendBtn) sendBtn.disabled = true;
     showTyping();
 
     try {
@@ -1273,15 +1234,9 @@ chatForm.addEventListener('submit', async (e) => {
         });
         removeTyping();
 
-        if (resp.status === 401) {
-            showToast('Session expired. Please log in again.', 'error');
-            doLogout();
-            return;
-        }
         if (resp.status === 429) {
             const errData = await resp.json();
-            showToast(errData.detail || 'Daily quota reached. Upgrade your plan!', 'error');
-            showNotifBanner(`Daily query limit reached. <span class="nb-link" onclick="openSubscriptionModal()">Upgrade your plan</span> to continue.`, 'warning');
+            showToast(errData.detail || 'Daily quota reached.', 'error');
             return;
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -1299,27 +1254,30 @@ chatForm.addEventListener('submit', async (e) => {
         renderHistory();
 
         if (ttsEnabled) speakRaw(data.answer);
-
-        // Refresh usage bar after each query
         refreshUsageBar();
 
     } catch (err) {
         removeTyping();
-        console.error(err);
-        appendMessage('system', `<div class="message-text"><p style="color:var(--danger)">&#x26A0;&#xFE0F; Could not reach the server. Please check if the backend is running.</p></div>`);
-        showToast('Connection failed', 'error');
+        console.error('Chat error:', err);
+        appendMessage('system', `<div class="message-text"><p style="color:var(--danger)">⚠️ Could not reach the server. Please check if the backend is running.</p></div>`);
+        showToast('Connection failed. Retrying backend connection...', 'error');
     } finally {
-        sendBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
         userInput.focus();
     }
+};
+
+chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitChatMessage();
 });
 
 // ===== SUGGESTION CHIPS =====
 document.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
         switchPanel('chat-panel');
-        userInput.value = chip.getAttribute('data-query');
-        chatForm.dispatchEvent(new Event('submit'));
+        const q = chip.getAttribute('data-query');
+        if (q) submitChatMessage(q);
     });
 });
 
@@ -1403,7 +1361,7 @@ function stopVoiceRecording() {
 
 voiceInputBtn.addEventListener('click', () => isRecording ? stopVoiceRecording() : startVoiceRecording());
 voiceMicBtn.addEventListener('click', () => isRecording ? stopVoiceRecording() : startVoiceRecording());
-stopRecordingBtn.addEventListener('click', () => { stopVoiceRecording(); if (userInput.value.trim()) chatForm.dispatchEvent(new Event('submit')); });
+stopRecordingBtn.addEventListener('click', () => { stopVoiceRecording(); if (userInput.value.trim()) submitChatMessage(); });
 
 // ===== TEXT-TO-SPEECH =====
 ttsToggleBtn.addEventListener('click', () => {

@@ -154,6 +154,10 @@
                             <span class="control-label">Read</span>
                         </button>
                     </div>
+                    <button class="control-btn" id="header-auth-btn" onclick="openAuthModal()" style="border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); cursor: pointer;">
+                        <span class="control-icon" id="header-auth-icon">&#x1F511;</span>
+                        <span class="control-label" id="header-auth-label">Sign In</span>
+                    </button>
                     <div class="status-indicator" id="status-indicator">
                         <span class="dot"></span>
                         <span class="status-text">Online</span>
@@ -499,8 +503,9 @@
     <!-- ══════════════════════════════════════════
          AUTH MODAL (Login / Register / Forgot PW)
     ══════════════════════════════════════════ -->
-    <div id="auth-overlay" class="active">
-        <div class="auth-container">
+    <div id="auth-overlay">
+        <div class="auth-container" style="position: relative;">
+            <button class="modal-close-btn" onclick="closeAuthModal()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;" aria-label="Close auth modal">&times;</button>
             <div class="auth-brand">
                 <div class="auth-logo-wrap">&#x1F9EC;</div>
                 <h2>OncoGraph AI</h2>
@@ -797,106 +802,9 @@
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════════
-         ONBOARDING WIZARD
-    ══════════════════════════════════════════ -->
-    <div id="onboarding-overlay">
-        <div class="onboarding-box">
-            <!-- Step dots -->
-            <div class="ob-steps">
-                <div class="ob-step-dot active" id="ob-dot-0"></div>
-                <div class="ob-step-dot" id="ob-dot-1"></div>
-                <div class="ob-step-dot" id="ob-dot-2"></div>
-            </div>
-
-            <!-- Step 0: Welcome + Role -->
-            <div class="ob-pane active" id="ob-step-0">
-                <div class="ob-title">Welcome to OncoGraph AI &#x1F9EC;</div>
-                <div class="ob-subtitle">Let's personalize your experience. What best describes your role?</div>
-                <div class="ob-options-grid">
-                    <div class="ob-option" data-ob-role="clinician" onclick="selectObOption(this,'role')">
-                        <div class="ob-option-icon">&#x1FA7A;</div>
-                        <div class="ob-option-label">Clinician</div>
-                        <div class="ob-option-desc">Oncologist, physician, NP/PA</div>
-                    </div>
-                    <div class="ob-option" data-ob-role="researcher" onclick="selectObOption(this,'role')">
-                        <div class="ob-option-icon">&#x1F52C;</div>
-                        <div class="ob-option-label">Researcher</div>
-                        <div class="ob-option-desc">Academic, biotech, pharma</div>
-                    </div>
-                    <div class="ob-option" data-ob-role="patient" onclick="selectObOption(this,'role')">
-                        <div class="ob-option-icon">&#x1F9D1;</div>
-                        <div class="ob-option-label">Patient / Caregiver</div>
-                        <div class="ob-option-desc">Seeking information & support</div>
-                    </div>
-                    <div class="ob-option" data-ob-role="student" onclick="selectObOption(this,'role')">
-                        <div class="ob-option-icon">&#x1F393;</div>
-                        <div class="ob-option-label">Student</div>
-                        <div class="ob-option-desc">Medical or science student</div>
-                    </div>
-                </div>
-                <div class="ob-nav">
-                    <button class="ob-btn" onclick="obNext()">Continue &#x2192;</button>
-                </div>
-            </div>
-
-            <!-- Step 1: Specialty focus -->
-            <div class="ob-pane" id="ob-step-1">
-                <div class="ob-title">Your Primary Focus</div>
-                <div class="ob-subtitle">Which cancer type or area do you work with most?</div>
-                <div class="ob-options-grid">
-                    <div class="ob-option" data-ob-focus="Lung Cancer" onclick="selectObOption(this,'focus')">
-                        <div class="ob-option-icon">&#x1FAC1;</div>
-                        <div class="ob-option-label">Lung / Thoracic</div>
-                    </div>
-                    <div class="ob-option" data-ob-focus="Breast Cancer" onclick="selectObOption(this,'focus')">
-                        <div class="ob-option-icon">&#x1F9E1;</div>
-                        <div class="ob-option-label">Breast</div>
-                    </div>
-                    <div class="ob-option" data-ob-focus="Hematology" onclick="selectObOption(this,'focus')">
-                        <div class="ob-option-icon">&#x1FA78;</div>
-                        <div class="ob-option-label">Hematology</div>
-                    </div>
-                    <div class="ob-option" data-ob-focus="GI Oncology" onclick="selectObOption(this,'focus')">
-                        <div class="ob-option-icon">&#x1F7E0;</div>
-                        <div class="ob-option-label">GI / Colorectal</div>
-                    </div>
-                    <div class="ob-option" data-ob-focus="General Oncology" onclick="selectObOption(this,'focus')">
-                        <div class="ob-option-icon">&#x1F9EC;</div>
-                        <div class="ob-option-label">General Oncology</div>
-                    </div>
-                    <div class="ob-option" data-ob-focus="Other" onclick="selectObOption(this,'focus')">
-                        <div class="ob-option-icon">&#x1F4CB;</div>
-                        <div class="ob-option-label">Other / All</div>
-                    </div>
-                </div>
-                <div class="ob-nav">
-                    <button class="ob-btn secondary" onclick="obBack()">&#x2190; Back</button>
-                    <button class="ob-btn" onclick="obNext()">Continue &#x2192;</button>
-                </div>
-            </div>
-
-            <!-- Step 2: First query -->
-            <div class="ob-pane" id="ob-step-2">
-                <div class="ob-title">&#x1F4AC; Try Your First Query</div>
-                <div class="ob-subtitle">Pick a sample question to get started &mdash; or just close and type your own.</div>
-                <div class="ob-sample-chips">
-                    <button class="ob-chip" data-query="What is the protocol for Febrile Neutropenia emergency?" onclick="selectObChip(this)">&#x1F6A8; Febrile Neutropenia Emergency Protocol</button>
-                    <button class="ob-chip" data-query="EGFR Exon 19 deletion targeted therapy options" onclick="selectObChip(this)">&#x1F9EC; EGFR Exon 19 Targeted Therapies</button>
-                    <button class="ob-chip" data-query="Explain immunotherapy side effects and irAE management" onclick="selectObChip(this)">&#x1F6E1;&#xFE0F; Immunotherapy irAE Management</button>
-                    <button class="ob-chip" data-query="TNM 8th edition staging for breast cancer" onclick="selectObChip(this)">&#x1F4CA; TNM Staging for Breast Cancer</button>
-                </div>
-                <div class="ob-nav">
-                    <button class="ob-btn secondary" onclick="obBack()">&#x2190; Back</button>
-                    <button class="ob-btn" onclick="finishOnboarding()">&#x1F680; Launch OncoGraph AI</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Toast notification container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="script.js?v=20261024_auth_v4"></script>
+    <script src="script.js?v=20261024_clean_v6"></script>
 </body>
 </html>
