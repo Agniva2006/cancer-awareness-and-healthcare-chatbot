@@ -274,14 +274,13 @@ def load_users() -> dict:
             users[k] = v
 
     # Ensure defaults exist
-    if(
-    os.environ.get("APP_ENV", "").lower() != "production"
-    and os.environ.get("ENABLE_DEMO_USERS", "").lower() == "true"
-   ):
-    # pyrefly: ignore[parse-error]
-    for uname, udata in DEFAULT_USERS.items():
-        if uname not in users:
-            users[uname] = udata.copy()
+    if (
+        os.environ.get("APP_ENV", "").lower() != "production"
+        or os.environ.get("ENABLE_DEMO_USERS", "true").lower() == "true"
+    ):
+        for uname, udata in DEFAULT_USERS.items():
+            if uname not in users:
+                users[uname] = udata.copy()
 
     _USERS_CACHE = users
     return users
