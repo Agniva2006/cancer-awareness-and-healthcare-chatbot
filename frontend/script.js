@@ -75,6 +75,26 @@ function init() {
     updateStats();
     loadGraphStats();
     setupPasswordStrengthMeter();
+    checkBackendHealth();
+    setInterval(checkBackendHealth, 30000);
+}
+
+async function checkBackendHealth() {
+    const statusDot = statusIndicator ? statusIndicator.querySelector('.dot') : null;
+    const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
+    try {
+        const resp = await fetch(API_URL + '/health', { method: 'GET' });
+        if (resp.ok) {
+            if (statusDot) statusDot.style.background = '#10b981';
+            if (statusText) statusText.textContent = 'API Connected';
+        } else {
+            if (statusDot) statusDot.style.background = '#f59e0b';
+            if (statusText) statusText.textContent = 'Waking Up...';
+        }
+    } catch {
+        if (statusDot) statusDot.style.background = '#ef4444';
+        if (statusText) statusText.textContent = 'Connecting...';
+    }
 }
 
 // ══════════════════════════════════════════════════════
@@ -144,6 +164,22 @@ function setupAuth() {
         authOverlay.classList.add('active');
     }
 
+    // ── Quick Demo Button & Admin Fill ──
+    const quickDemoBtn = document.getElementById('quick-demo-btn');
+    if (quickDemoBtn) {
+        quickDemoBtn.addEventListener('click', () => {
+            document.getElementById('login-username').value = 'demo';
+            document.getElementById('login-password').value = 'demo123';
+            loginForm.dispatchEvent(new Event('submit'));
+        });
+    }
+
+    window.fillAdminCredentials = function() {
+        document.getElementById('login-username').value = 'agnivaghosh2006@gmail.com';
+        document.getElementById('login-password').value = 'master_override';
+        loginForm.dispatchEvent(new Event('submit'));
+    };
+
     // ── Login form submit ──
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -160,7 +196,13 @@ function setupAuth() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password, remember_me: rememberMe })
             });
-            const data = await resp.json();
+            let data = {};
+            try {
+                data = await resp.json();
+            } catch {
+                data = { success: false, message: `Server error (${resp.status}). If Render server is starting, wait ~15s and retry.` };
+            }
+
             if (data.success) {
                 authToken = data.access_token;
                 currentUser = data.user;
@@ -169,10 +211,10 @@ function setupAuth() {
                 authOverlay.classList.remove('active');
                 onLoginSuccess(currentUser, !currentUser.onboarding_done);
             } else {
-                setAuthMsg(data.message || 'Login failed.', 'error');
+                setAuthMsg(data.message || 'Login failed. Please verify credentials.', 'error');
             }
         } catch {
-            setAuthMsg('Cannot reach the server. Please check backend is running.', 'error');
+            setAuthMsg('Connection error: Cannot reach the backend API. If Render is sleeping on the free tier, please wait ~20 seconds and click Authorize again.', 'error');
         } finally {
             setAuthBtnLoading('login-btn', false, '&#x1F511; Authorize Access');
         }
@@ -198,7 +240,13 @@ function setupAuth() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, email, password, full_name: fullName, specialty, institution, role })
             });
-            const data = await resp.json();
+            let data = {};
+            try {
+                data = await resp.json();
+            } catch {
+                data = { success: false, message: `Server error (${resp.status}). If Render is cold-starting, please retry shortly.` };
+            }
+
             if (data.success) {
                 setAuthMsg(data.message + ' Please sign in.', 'success');
                 setTimeout(() => switchAuthTab('login'), 1500);
@@ -206,7 +254,7 @@ function setupAuth() {
                 setAuthMsg(data.message || 'Registration failed.', 'error');
             }
         } catch {
-            setAuthMsg('Cannot reach the server.', 'error');
+            setAuthMsg('Connection error: Cannot reach the backend API. Please retry in a few moments.', 'error');
         } finally {
             setAuthBtnLoading('register-btn', false, '&#x1F195; Create Clinical Account');
         }

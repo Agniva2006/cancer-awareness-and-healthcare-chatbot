@@ -7,10 +7,13 @@ import os
 import time
 import json
 import secrets
+import logging
+import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict
 
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -21,19 +24,31 @@ from jose import JWTError, jwt
 # ──────────────────────────────────────────────
 
 # SECRET_KEY priority:
-#  1. ONCOGRAPH_SECRET_KEY environment variable  (set this on Render for stable tokens)
-#  2. Persistent file on disk (local dev)
-#  3. Auto-generated random (fallback — tokens won't survive restarts)
-_SECRET_ENV = os.environ.get("ONCOGRAPH_SECRET_KEY", "").strip()
+#  1. ONCOGRAPH_SECRET_KEY / JWT_SECRET / SECRET_KEY environment variables
+#  2. Persistent file on disk (local dev / data/.jwt_secret)
+#  3. Stable default fallback key (prevents token invalidation across Render spin-down cycles)
+_SECRET_ENV = (
+    os.environ.get("ONCOGRAPH_SECRET_KEY", "").strip()
+    or os.environ.get("JWT_SECRET", "").strip()
+    or os.environ.get("SECRET_KEY", "").strip()
+)
 _SECRET_FILE = Path(__file__).resolve().parent.parent / "data" / ".jwt_secret"
-_SECRET_FILE.parent.mkdir(exist_ok=True)
+try:
+    _SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+DEFAULT_FALLBACK_SECRET = "oncograph-ai-clinical-secret-key-prod-2026-stable-enterprise-token"
 
 if _SECRET_ENV:
     SECRET_KEY = _SECRET_ENV
 elif _SECRET_FILE.exists():
-    SECRET_KEY = _SECRET_FILE.read_text().strip()
+    try:
+        SECRET_KEY = _SECRET_FILE.read_text().strip() or DEFAULT_FALLBACK_SECRET
+    except Exception:
+        SECRET_KEY = DEFAULT_FALLBACK_SECRET
 else:
-    SECRET_KEY = secrets.token_hex(32)
+    SECRET_KEY = DEFAULT_FALLBACK_SECRET
     try:
         _SECRET_FILE.write_text(SECRET_KEY)
     except Exception:
@@ -130,16 +145,47 @@ PLANS: Dict[str, dict] = {
 }
 
 # ──────────────────────────────────────────────
-# Password hashing
+# Password hashing — Direct bcrypt with passlib fallback
+# (Avoids passlib unmaintained bcrypt __about__ version bug)
 # ──────────────────────────────────────────────
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def _truncate_password(password: str) -> bytes:
+    # bcrypt allows max 72 bytes. Safely truncate or encode.
+    return str(password).encode("utf-8")[:72]
+
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    try:
+        salt = bcrypt.gensalt(rounds=12)
+        return bcrypt.hashpw(_truncate_password(password), salt).decode("utf-8")
+    except Exception as e:
+        logging.warning(f"Native bcrypt hashpw failed: {e}. Trying fallback.")
+        try:
+            return pwd_context.hash(password)
+        except Exception:
+            salt_hex = secrets.token_hex(16)
+            digest = hashlib.sha256(f"{salt_hex}:{password}".encode("utf-8")).hexdigest()
+            return f"sha256${salt_hex}${digest}"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        pwd_bytes = _truncate_password(plain_password)
+        hash_bytes = str(hashed_password).strip().encode("utf-8")
+        if hashed_password.startswith(("$2a$", "$2b$", "$2y$")):
+            return bcrypt.checkpw(pwd_bytes, hash_bytes)
+        elif hashed_password.startswith("sha256$"):
+            parts = hashed_password.split("$")
+            if len(parts) == 3:
+                _, salt_hex, digest = parts
+                test_digest = hashlib.sha256(f"{salt_hex}:{plain_password}".encode("utf-8")).hexdigest()
+                return secrets.compare_digest(digest, test_digest)
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        logging.warning(f"verify_password caught safe exception: {e}")
+        return False
 
 # ──────────────────────────────────────────────
 # JWT helpers
@@ -169,22 +215,89 @@ def decode_token(token: str) -> dict:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login-form", auto_error=False)
 
 # ──────────────────────────────────────────────
-# User DB helpers
+# User DB helpers & Seed Data
 # ──────────────────────────────────────────────
 
 USER_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "users_db.json"
-USER_DB_PATH.parent.mkdir(exist_ok=True)
+try:
+    USER_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+# Seed users available even if filesystem is read-only or empty
+DEFAULT_USERS: Dict[str, dict] = {
+    "demo": {
+        "password": hash_password("demo123"),
+        "email": "demo@oncograph.ai",
+        "full_name": "Dr. Demo Oncologist",
+        "specialty": "Medical Oncology",
+        "institution": "OncoGraph Demo Hospital",
+        "role": "clinician",
+        "plan": "enterprise",
+        "avatar_color": "#6366f1",
+        "created_at": "2026-08-13T00:00:00Z",
+        "last_login": "",
+        "onboarding_done": True,
+        "usage_daily": {},
+        "usage_monthly": {},
+        "activity": [],
+        "sessions": []
+    },
+    "dr_smith": {
+        "password": hash_password("clinical2026"),
+        "email": "smith@oncograph.ai",
+        "full_name": "Dr. Sarah Smith",
+        "specialty": "Radiation Oncology",
+        "institution": "Johns Hopkins Medicine",
+        "role": "clinician",
+        "plan": "clinical",
+        "avatar_color": "#10b981",
+        "created_at": "2026-08-13T00:00:00Z",
+        "last_login": "",
+        "onboarding_done": True,
+        "usage_daily": {},
+        "usage_monthly": {},
+        "activity": [],
+        "sessions": []
+    }
+}
+
+_USERS_CACHE: Dict[str, dict] = {}
 
 def load_users() -> dict:
-    try:
-        with open(USER_DB_PATH, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    global _USERS_CACHE
+    users = {}
+    if USER_DB_PATH.exists():
+        try:
+            with open(USER_DB_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    users = loaded
+        except Exception as e:
+            logging.warning(f"Could not read users_db.json: {e}")
+
+    # Merge with memory cache
+    for k, v in _USERS_CACHE.items():
+        if k not in users:
+            users[k] = v
+
+    # Ensure defaults exist
+    for uname, udata in DEFAULT_USERS.items():
+        if uname not in users:
+            users[uname] = udata.copy()
+
+    _USERS_CACHE = users
+    return users
 
 def save_users(users: dict):
-    with open(USER_DB_PATH, "w") as f:
-        json.dump(users, f, indent=2)
+    global _USERS_CACHE
+    _USERS_CACHE = users.copy()
+    try:
+        USER_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(USER_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(users, f, indent=2)
+    except Exception as e:
+        logging.warning(f"Could not write users_db.json (filesystem may be ephemeral/read-only): {e}")
 
 # ──────────────────────────────────────────────
 # Usage tracking

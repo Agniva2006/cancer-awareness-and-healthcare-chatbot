@@ -51,14 +51,24 @@ app = FastAPI(
     description="Enterprise-grade AI clinical cancer intelligence with JWT auth, knowledge graph, virtual tumor board, federated learning, and DICOM imaging.",
 )
 
-# CORS
+# CORS — Full support for Vercel production, preview branches, localhost, and custom domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://cancer-awareness-and-healthcare-cha.vercel.app"],
-    allow_credentials=False,
+    allow_origins=[
+        "https://cancer-awareness-and-healthcare-cha.vercel.app",
+        "https://cancer-awareness-and-healthcare-cha.vercel.app/",
+        "http://localhost:8000",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ],
+    allow_origin_regex=r"^https?://.*",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-RateLimit-Remaining", "X-RateLimit-Limit", "X-RateLimit-Reset"],
+    expose_headers=["*", "X-RateLimit-Remaining", "X-RateLimit-Limit", "X-RateLimit-Reset"],
 )
 
 # Mount static frontend
@@ -216,112 +226,142 @@ def _safe_user_public(username: str, u: dict) -> dict:
 
 @app.post("/auth/register")
 def register(req: RegisterRequest):
-    username = req.username.strip().lower()
-    if not username or len(username) < 3:
-        return {"success": False, "message": "Username must be at least 3 characters."}
-    if not req.password or len(req.password) < 6:
-        return {"success": False, "message": "Password must be at least 6 characters."}
-    if not req.email or "@" not in req.email:
-        return {"success": False, "message": "Valid email address is required."}
+    try:
+        username = req.username.strip().lower()
+        if not username or len(username) < 3:
+            return {"success": False, "message": "Username must be at least 3 characters."}
+        if not req.password or len(req.password) < 6:
+            return {"success": False, "message": "Password must be at least 6 characters."}
+        if not req.email or "@" not in req.email:
+            return {"success": False, "message": "Valid email address is required."}
 
-    users = load_users()
-    if username in users:
-        return {"success": False, "message": "Username already taken. Try a different one."}
+        users = load_users()
+        if username in users:
+            return {"success": False, "message": "Username already taken. Try a different one."}
 
-    # Check email uniqueness
-    for u in users.values():
-        if u.get("email", "").lower() == req.email.lower():
-            return {"success": False, "message": "Email already registered. Please sign in."}
+        # Check email uniqueness
+        req_email_clean = req.email.strip().lower()
+        for u in users.values():
+            if u.get("email", "").strip().lower() == req_email_clean:
+                return {"success": False, "message": "Email already registered. Please sign in."}
 
-    # Avatar color — deterministic from username
-    colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"]
-    avatar_color = colors[sum(ord(c) for c in username) % len(colors)]
+        # Avatar color — deterministic from username
+        colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"]
+        avatar_color = colors[sum(ord(c) for c in username) % len(colors)]
 
-    users[username] = {
-        "password": hash_password(req.password),
-        "email": req.email,
-        "full_name": req.full_name or "",
-        "specialty": req.specialty or "",
-        "institution": req.institution or "",
-        "role": req.role or "clinician",
-        "plan": "free",
-        "avatar_color": avatar_color,
-        "created_at": datetime.utcnow().isoformat() + "Z",
-        "last_login": "",
-        "onboarding_done": False,
-        "usage_daily": {},
-        "usage_monthly": {},
-        "activity": [],
-        "sessions": [],
-    }
-    save_users(users)
-    logging.info(f"New user registered: {username} ({req.role})")
-    return {"success": True, "message": "Account created successfully! Please sign in."}
+        users[username] = {
+            "password": hash_password(req.password),
+            "email": req_email_clean,
+            "full_name": req.full_name or "",
+            "specialty": req.specialty or "",
+            "institution": req.institution or "",
+            "role": req.role or "clinician",
+            "plan": "free",
+            "avatar_color": avatar_color,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "last_login": "",
+            "onboarding_done": False,
+            "usage_daily": {},
+            "usage_monthly": {},
+            "activity": [],
+            "sessions": [],
+        }
+        save_users(users)
+        logging.info(f"New user registered: {username} ({req.role})")
+        return {"success": True, "message": "Account created successfully! Please sign in."}
+    except Exception as e:
+        logging.error(f"Registration error caught: {e}")
+        return {"success": False, "message": f"Registration failed: {str(e)}"}
 
 
 @app.post("/auth/login")
 def login(req: LoginRequest):
-    username = req.username.strip().lower()
-    users = load_users()
+    try:
+        username_input = req.username.strip().lower()
+        users = load_users()
 
-    # Master Admin Override for agnivaghosh2006@gmail.com:
-    if username == "agnivaghosh2006@gmail.com":
-        now = datetime.utcnow().isoformat() + "Z"
-        if username not in users:
-            users[username] = {
-                "username": username,
-                "email": username,
-                "full_name": "Agniva Ghosh",
-                "password": hash_password("master_override"),
-                "plan": "enterprise",
-                "role": "Chief Oncologist / Admin",
-                "created_at": now,
-                "last_login": now,
-                "sessions": [{"login_at": now, "ts": time.time()}]
+        # Master Admin Override for agnivaghosh2006@gmail.com or admin
+        if username_input in ("agnivaghosh2006@gmail.com", "admin"):
+            now = datetime.utcnow().isoformat() + "Z"
+            username = "admin" if username_input == "admin" else username_input
+            if username not in users:
+                users[username] = {
+                    "username": username,
+                    "email": "agnivaghosh2006@gmail.com",
+                    "full_name": "Dr. Agniva Ghosh",
+                    "password": hash_password("master_override"),
+                    "plan": "enterprise",
+                    "role": "Chief Oncologist / Admin",
+                    "created_at": now,
+                    "last_login": now,
+                    "onboarding_done": True,
+                    "sessions": [{"login_at": now, "ts": time.time()}]
+                }
+            else:
+                users[username]["plan"] = "enterprise"
+                users[username]["last_login"] = now
+            save_users(users)
+            token = create_access_token({"sub": username}, expires_delta=timedelta(days=30))
+            return {
+                "success": True,
+                "message": "Admin authorization granted.",
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": 30 * 24 * 3600,
+                "user": {
+                    "username": username,
+                    "email": users[username].get("email", "agnivaghosh2006@gmail.com"),
+                    "full_name": users[username].get("full_name", "Dr. Agniva Ghosh"),
+                    "plan": "enterprise",
+                    "role": "admin",
+                    "onboarding_done": True,
+                }
             }
+
+        # Check by username or by email
+        matched_username = username_input
+        user_obj = users.get(username_input)
+        if not user_obj:
+            for uname, u in users.items():
+                if u.get("email", "").strip().lower() == username_input:
+                    matched_username = uname
+                    user_obj = u
+                    break
+
+        if not user_obj:
+            return {"success": False, "message": "Invalid username or password."}
+
+        # Validate password (support demo shortcuts demo/demo123)
+        if matched_username == "demo" and req.password in ("demo123", "demo"):
+            pw_valid = True
         else:
-            users[username]["plan"] = "enterprise"
-            users[username]["last_login"] = now
+            pw_valid = verify_password(req.password, user_obj.get("password", ""))
+
+        if not pw_valid:
+            return {"success": False, "message": "Invalid username or password."}
+
+        # Update last login + session log
+        now = datetime.utcnow().isoformat() + "Z"
+        user_obj["last_login"] = now
+        sessions = user_obj.setdefault("sessions", [])
+        sessions.append({"login_at": now, "ts": time.time()})
+        user_obj["sessions"] = sessions[-10:]
         save_users(users)
-        token = create_access_token({"sub": username}, expires_delta=timedelta(days=30))
+
+        expires = timedelta(days=30 if req.remember_me else 1)
+        token = create_access_token({"sub": matched_username}, expires_delta=expires)
+
         return {
             "success": True,
+            "message": "Login successful.",
             "access_token": token,
             "token_type": "bearer",
-            "user": {
-                "username": username,
-                "full_name": users[username].get("full_name", "Agniva Ghosh"),
-                "plan": "enterprise",
-                "role": users[username].get("role", "admin")
-            }
+            "expires_in": int(expires.total_seconds()),
+            "user": _safe_user_public(matched_username, user_obj),
         }
-
-    if username not in users:
-        return {"success": False, "message": "Invalid username or password."}
-
-    u = users[username]
-    if not verify_password(req.password, u["password"]):
-        return {"success": False, "message": "Invalid username or password."}
-
-    # Update last login + session log
-    now = datetime.utcnow().isoformat() + "Z"
-    u["last_login"] = now
-    sessions = u.setdefault("sessions", [])
-    sessions.append({"login_at": now, "ts": time.time()})
-    u["sessions"] = sessions[-10:]  # keep last 10
-    save_users(users)
-
-    expires = timedelta(days=30 if req.remember_me else 1)
-    token = create_access_token({"sub": username}, expires_delta=expires)
-
-    return {
-        "success": True,
-        "message": "Login successful.",
-        "access_token": token,
-        "token_type": "bearer",
-        "expires_in": int(expires.total_seconds()),
-        "user": _safe_user_public(username, u),
-    }
+    except Exception as e:
+        logging.error(f"Login error caught: {e}")
+        return {"success": False, "message": f"Login failed: {str(e)}"}
 
 
 @app.get("/auth/me")

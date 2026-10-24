@@ -519,6 +519,20 @@
 
             <!-- ── Login Pane ── -->
             <div class="auth-pane active" id="auth-pane-login">
+                <div class="demo-access-card" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 0.8rem; font-weight: 600; color: #818cf8; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Instant Evaluation</span>
+                        <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.25); color: #c7d2fe; padding: 2px 7px; border-radius: 12px;">Enterprise Tier</span>
+                    </div>
+                    <button type="button" id="quick-demo-btn" class="auth-submit-btn" style="background: linear-gradient(135deg, #4f46e5, #0891b2); margin: 0 0 8px 0; padding: 10px 14px; font-size: 0.88rem; font-weight: 600; cursor: pointer; border: none; border-radius: 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+                        <span>🚀</span> One-Click Demo Clinician Access
+                    </button>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.73rem; color: #94a3b8;">
+                        <span>User: <code style="color: #cbd5e1; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">demo</code></span>
+                        <span>Pass: <code style="color: #cbd5e1; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">demo123</code></span>
+                        <a href="#" onclick="fillAdminCredentials(); return false;" style="color: #818cf8; text-decoration: underline;">Admin login</a>
+                    </div>
+                </div>
                 <form id="login-form" autocomplete="on">
                     <div class="auth-field">
                         <label>Username</label>
