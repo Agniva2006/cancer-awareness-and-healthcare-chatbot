@@ -164,29 +164,7 @@ function setupAuth() {
         authOverlay.classList.add('active');
     }
 
-    // ── Quick Demo Button & Admin Fill ──
-    const quickDemoBtn = document.getElementById('quick-demo-btn');
-    if (quickDemoBtn) {
-        quickDemoBtn.addEventListener('click', () => {
-            document.getElementById('login-username').value = 'demo';
-            document.getElementById('login-password').value = 'demo123';
-            loginForm.dispatchEvent(new Event('submit'));
-        });
-    }
-
-    window.fillAdminCredentials = function() {
-        document.getElementById('login-username').value = 'agnivaghosh2006@gmail.com';
-        document.getElementById('login-password').value = 'master_override';
-        loginForm.dispatchEvent(new Event('submit'));
-    };
-
-    // ── Login form submit ──
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('login-username').value.trim();
-        const password = document.getElementById('login-password').value;
-        const rememberMe = document.getElementById('remember-me').checked;
-
+    async function performLogin(username, password, rememberMe = true) {
         setAuthMsg('', '');
         setAuthBtnLoading('login-btn', true, 'Authorizing...');
 
@@ -218,6 +196,32 @@ function setupAuth() {
         } finally {
             setAuthBtnLoading('login-btn', false, '&#x1F511; Authorize Access');
         }
+    }
+
+    // ── Quick Demo Button & Admin Fill ──
+    const quickDemoBtn = document.getElementById('quick-demo-btn');
+    if (quickDemoBtn) {
+        quickDemoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-username').value = 'demo';
+            document.getElementById('login-password').value = 'demo123';
+            performLogin('demo', 'demo123', true);
+        });
+    }
+
+    window.fillAdminCredentials = function() {
+        document.getElementById('login-username').value = 'agnivaghosh2006@gmail.com';
+        document.getElementById('login-password').value = 'master_override';
+        performLogin('agnivaghosh2006@gmail.com', 'master_override', true);
+    };
+
+    // ── Login form submit ──
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        const rememberMe = document.getElementById('remember-me').checked;
+        await performLogin(username, password, rememberMe);
     });
 
     // ── Register form submit ──
@@ -1511,6 +1515,7 @@ function setupGraphPanel() {
 }
 
 async function loadGraphStats() {
+    if (!authToken) return;
     try {
         const resp = await fetch(API_URL + '/graph/stats', { headers: getAuthHeaders() });
         if (!resp.ok) return;
@@ -1589,6 +1594,7 @@ function renderGraphResults(queryType, data) {
 }
 
 async function drawGraphVisualization() {
+    if (!authToken) return;
     const canvas = document.getElementById('graph-canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.parentElement.clientWidth;
@@ -1777,10 +1783,10 @@ function renderTumorBoardResults(data) {
 function setupFederatedPanel() {
     document.getElementById('fed-run-btn').addEventListener('click', runFederatedTraining);
     document.getElementById('fed-status-btn').addEventListener('click', loadFederatedStatus);
-    loadFederatedStatus();
 }
 
 async function loadFederatedStatus() {
+    if (!authToken) return;
     try {
         const resp = await fetch(API_URL + '/federated/status', { headers: getAuthHeaders() });
         if (!resp.ok) return;
