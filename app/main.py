@@ -64,7 +64,7 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "http://localhost:5500",
     ],
-    allow_origin_regex=r"^https?://.*",
+    
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -280,76 +280,47 @@ def login(req: LoginRequest):
         username_input = req.username.strip().lower()
         users = load_users()
 
-        # Master Admin Override for agnivaghosh2006@gmail.com or admin
-        if username_input in ("agnivaghosh2006@gmail.com", "admin"):
-            now = datetime.utcnow().isoformat() + "Z"
-            username = "admin" if username_input == "admin" else username_input
-            if username not in users:
-                users[username] = {
-                    "username": username,
-                    "email": "agnivaghosh2006@gmail.com",
-                    "full_name": "Dr. Agniva Ghosh",
-                    "password": hash_password("master_override"),
-                    "plan": "enterprise",
-                    "role": "Chief Oncologist / Admin",
-                    "created_at": now,
-                    "last_login": now,
-                    "onboarding_done": True,
-                    "sessions": [{"login_at": now, "ts": time.time()}]
-                }
-            else:
-                users[username]["plan"] = "enterprise"
-                users[username]["last_login"] = now
-            save_users(users)
-            token = create_access_token({"sub": username}, expires_delta=timedelta(days=30))
-            return {
-                "success": True,
-                "message": "Admin authorization granted.",
-                "access_token": token,
-                "token_type": "bearer",
-                "expires_in": 30 * 24 * 3600,
-                "user": {
-                    "username": username,
-                    "email": users[username].get("email", "agnivaghosh2006@gmail.com"),
-                    "full_name": users[username].get("full_name", "Dr. Agniva Ghosh"),
-                    "plan": "enterprise",
-                    "role": "admin",
-                    "onboarding_done": True,
-                }
-            }
-
-        # Check by username or by email
+        # Find user by username or email
         matched_username = username_input
         user_obj = users.get(username_input)
+
         if not user_obj:
-            for uname, u in users.items():
-                if u.get("email", "").strip().lower() == username_input:
+            for uname, user in users.items():
+                if user.get("email", "").strip().lower() == username_input:
                     matched_username = uname
-                    user_obj = u
+                    user_obj = user
                     break
 
-        if not user_obj:
-            return {"success": False, "message": "Invalid username or password."}
+        # Use the same password verification for every account
+        if not user_obj or not verify_password(
+            req.password, user_obj.get("password", "")
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid username or password."
+            )
 
-        # Validate password (support demo shortcuts demo/demo123)
-        if matched_username == "demo" and req.password in ("demo123", "demo"):
-            pw_valid = True
-        else:
-            pw_valid = verify_password(req.password, user_obj.get("password", ""))
-
-        if not pw_valid:
-            return {"success": False, "message": "Invalid username or password."}
-
-        # Update last login + session log
+        # Update login information
         now = datetime.utcnow().isoformat() + "Z"
         user_obj["last_login"] = now
+
         sessions = user_obj.setdefault("sessions", [])
-        sessions.append({"login_at": now, "ts": time.time()})
+        sessions.append({
+            "login_at": now,
+            "ts": time.time()
+        })
         user_obj["sessions"] = sessions[-10:]
+
         save_users(users)
 
-        expires = timedelta(days=30 if req.remember_me else 1)
-        token = create_access_token({"sub": matched_username}, expires_delta=expires)
+        # Issue token only after successful password verification
+        expires = timedelta(
+            days=30 if req.remember_me else 1
+        )
+        token = create_access_token(
+            {"sub": matched_username},
+            expires_delta=expires
+        )
 
         return {
             "success": True,
@@ -357,12 +328,17 @@ def login(req: LoginRequest):
             "access_token": token,
             "token_type": "bearer",
             "expires_in": int(expires.total_seconds()),
-            "user": _safe_user_public(matched_username, user_obj),
+            "user": _safe_user_public(matched_username, user_obj)
         }
-    except Exception as e:
-        logging.error(f"Login error caught: {e}")
-        return {"success": False, "message": f"Login failed: {str(e)}"}
 
+    except HTTPException:
+        raise
+    except Exception:
+        logging.exception("Login failed due to an internal error")
+        raise HTTPException(
+            status_code=500,
+            detail="Login failed due to an internal server error."
+        )
 
 @app.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):

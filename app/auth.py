@@ -27,36 +27,35 @@ from jose import JWTError, jwt
 #  1. ONCOGRAPH_SECRET_KEY / JWT_SECRET / SECRET_KEY environment variables
 #  2. Persistent file on disk (local dev / data/.jwt_secret)
 #  3. Stable default fallback key (prevents token invalidation across Render spin-down cycles)
-_SECRET_ENV = (
-    os.environ.get("ONCOGRAPH_SECRET_KEY", "").strip()
-    or os.environ.get("JWT_SECRET", "").strip()
-    or os.environ.get("SECRET_KEY", "").strip()
-)
-_SECRET_FILE = Path(__file__).resolve().parent.parent / "data" / ".jwt_secret"
-try:
-    _SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
-except Exception:
-    pass
 
-DEFAULT_FALLBACK_SECRET = "oncograph-ai-clinical-secret-key-prod-2026-stable-enterprise-token"
+# JWT configuration — fail closed if no secret is configured
+SECRET_KEY = os.environ.get("ONCOGRAPH_SECRET_KEY", "").strip()
 
-if _SECRET_ENV:
-    SECRET_KEY = _SECRET_ENV
-elif _SECRET_FILE.exists():
-    try:
-        SECRET_KEY = _SECRET_FILE.read_text().strip() or DEFAULT_FALLBACK_SECRET
-    except Exception:
-        SECRET_KEY = DEFAULT_FALLBACK_SECRET
-else:
-    SECRET_KEY = DEFAULT_FALLBACK_SECRET
-    try:
-        _SECRET_FILE.write_text(SECRET_KEY)
-    except Exception:
-        pass  # read-only filesystem (some Render tiers)
+if not SECRET_KEY:
+    if os.environ.get("APP_ENV", "").lower() == "production":
+        raise RuntimeError(
+            "ONCOGRAPH_SECRET_KEY must be configured in production"
+        )
+
+    # Local development only; do not use this for production.
+    secret_file = (
+        Path(__file__).resolve().parent.parent
+        / "data"
+        / ".jwt_secret"
+    )
+    if secret_file.exists():
+        SECRET_KEY = secret_file.read_text().strip()
+
+    if not SECRET_KEY:
+        raise RuntimeError(
+            "Configure ONCOGRAPH_SECRET_KEY or a local development secret"
+        )
+
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("JWT secret must be at least 32 characters long")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days (remember-me style)
-
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 # ──────────────────────────────────────────────
 # Plan definitions
 # ──────────────────────────────────────────────
@@ -156,17 +155,10 @@ def _truncate_password(password: str) -> bytes:
     return str(password).encode("utf-8")[:72]
 
 def hash_password(password: str) -> str:
-    try:
-        salt = bcrypt.gensalt(rounds=12)
-        return bcrypt.hashpw(_truncate_password(password), salt).decode("utf-8")
-    except Exception as e:
-        logging.warning(f"Native bcrypt hashpw failed: {e}. Trying fallback.")
-        try:
-            return pwd_context.hash(password)
-        except Exception:
-            salt_hex = secrets.token_hex(16)
-            digest = hashlib.sha256(f"{salt_hex}:{password}".encode("utf-8")).hexdigest()
-            return f"sha256${salt_hex}${digest}"
+    return bcrypt.hashpw(
+        password.encode("utf-8")[:72],
+        bcrypt.gensalt(rounds=12),
+    ).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     if not plain_password or not hashed_password:
@@ -282,6 +274,11 @@ def load_users() -> dict:
             users[k] = v
 
     # Ensure defaults exist
+    if(
+    os.environ.get("APP_ENV", "").lower() != "production"
+    and os.environ.get("ENABLE_DEMO_USERS", "").lower() == "true"
+   ):
+    # pyrefly: ignore[parse-error]
     for uname, udata in DEFAULT_USERS.items():
         if uname not in users:
             users[uname] = udata.copy()
