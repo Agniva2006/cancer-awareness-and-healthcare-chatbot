@@ -524,7 +524,7 @@
                         <span style="font-size: 0.8rem; font-weight: 600; color: #818cf8; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Instant Evaluation</span>
                         <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.25); color: #c7d2fe; padding: 2px 7px; border-radius: 12px;">Enterprise Tier</span>
                     </div>
-                    <button type="button" id="quick-demo-btn" class="auth-submit-btn" style="background: linear-gradient(135deg, #4f46e5, #0891b2); margin: 0 0 8px 0; padding: 10px 14px; font-size: 0.88rem; font-weight: 600; cursor: pointer; border: none; border-radius: 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+                    <button type="button" id="quick-demo-btn" class="auth-submit-btn" onclick="loginAsDemo()" style="background: linear-gradient(135deg, #4f46e5, #0891b2); margin: 0 0 8px 0; padding: 10px 14px; font-size: 0.88rem; font-weight: 600; cursor: pointer; border: none; border-radius: 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
                         <span>🚀</span> One-Click Demo Clinician Access
                     </button>
                     <div style="display: flex; justify-content: space-between; font-size: 0.73rem; color: #94a3b8;">
@@ -536,11 +536,11 @@
                 <form id="login-form" autocomplete="on">
                     <div class="auth-field">
                         <label>Username</label>
-                        <input type="text" id="login-username" required placeholder="e.g. dr_smith" autocomplete="username">
+                        <input type="text" id="login-username" required placeholder="demo (or dr_smith)" autocomplete="username">
                     </div>
                     <div class="auth-field">
                         <label>Password <a href="#" class="forgot-link" onclick="switchAuthTab('forgot');return false;">Forgot?</a></label>
-                        <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
+                        <input type="password" id="login-password" required placeholder="Enter password (demo123)" autocomplete="current-password">
                     </div>
                     <div class="auth-checkbox-row">
                         <input type="checkbox" id="remember-me" checked>
@@ -897,6 +897,6 @@
     <!-- Toast notification container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20261024_auth_v4"></script>
 </body>
 </html>

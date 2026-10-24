@@ -282,6 +282,10 @@ def load_users() -> dict:
             if uname not in users:
                 users[uname] = udata.copy()
 
+    # Ensure demo user has a valid password hash for demo123
+    if "demo" in users and not verify_password("demo123", users["demo"].get("password", "")):
+        users["demo"]["password"] = hash_password("demo123")
+
     _USERS_CACHE = users
     return users
 

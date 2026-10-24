@@ -189,7 +189,7 @@ function setupAuth() {
                 authOverlay.classList.remove('active');
                 onLoginSuccess(currentUser, !currentUser.onboarding_done);
             } else {
-                setAuthMsg(data.message || 'Login failed. Please verify credentials.', 'error');
+                setAuthMsg(data.detail || data.message || 'Login failed. Please verify credentials.', 'error');
             }
         } catch {
             setAuthMsg('Connection error: Cannot reach the backend API. If Render is sleeping on the free tier, please wait ~20 seconds and click Authorize again.', 'error');
@@ -199,19 +199,27 @@ function setupAuth() {
     }
 
     // ── Quick Demo Button & Admin Fill ──
+    window.loginAsDemo = function() {
+        const u = document.getElementById('login-username');
+        const p = document.getElementById('login-password');
+        if (u) u.value = 'demo';
+        if (p) p.value = 'demo123';
+        performLogin('demo', 'demo123', true);
+    };
+
     const quickDemoBtn = document.getElementById('quick-demo-btn');
     if (quickDemoBtn) {
         quickDemoBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            document.getElementById('login-username').value = 'demo';
-            document.getElementById('login-password').value = 'demo123';
-            performLogin('demo', 'demo123', true);
+            window.loginAsDemo();
         });
     }
 
     window.fillAdminCredentials = function() {
-        document.getElementById('login-username').value = 'agnivaghosh2006@gmail.com';
-        document.getElementById('login-password').value = 'master_override';
+        const u = document.getElementById('login-username');
+        const p = document.getElementById('login-password');
+        if (u) u.value = 'agnivaghosh2006@gmail.com';
+        if (p) p.value = 'master_override';
         performLogin('agnivaghosh2006@gmail.com', 'master_override', true);
     };
 
