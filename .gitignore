@@ -35,3 +35,6 @@ data/.jwt_secret
 .idea/
 *.swp
 *.swo
+
+data/.jwt_secret
+data/users_db.json 
