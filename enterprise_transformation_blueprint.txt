@@ -1,0 +1,112 @@
+================================================================================
+ONCOGRAPH AI: ENTERPRISE TRANSFORMATION BLUEPRINT & ARCHITECTURAL ROADMAP
+Target Maturity: 10/10 Hospital-Grade Commercial Medical Intelligence Platform
+Classification: Senior-Level Technical Specification Document
+================================================================================
+
+1. EXECUTIVE SUMMARY & ARCHITECTURAL VISION
+--------------------------------------------------------------------------------
+OncoGraph AI is transitioning from an advanced GraphRAG prototype into a fully 
+compliant, hospital-grade commercial software-as-a-medical-device (SaMD) platform. 
+This specification outlines the production-grade engineering designs across five core 
+verticals:
+  1. SMART on FHIR / HL7v2 Electronic Health Record (EHR) Integration & LLMOps.
+  2. Persistent Neo4j Enterprise Cluster with Unified Medical Ontologies (UMLS/SNOMED).
+  3. LangGraph Stateful Autonomous Multi-Agent Swarm with Human-in-the-Loop (HITL).
+  4. Containerized gRPC Federated Learning via Flower (flwr) and PyTorch Opacus DP-SGD.
+  5. MONAI-Powered 3D DICOM Semantic Segmentation & Survival Analysis Engine.
+
+--------------------------------------------------------------------------------
+2. COMPONENT 1: SMART ON FHIR EHR INTEGRATION & CONTINUOUS LLMOps
+--------------------------------------------------------------------------------
+A. Architecture & Flow:
+   - Integration with Epic / Cerner EHR via OAuth2.0 SMART on FHIR authorization framework.
+   - Real-time ingestion of Patient, Observation (Labs), Condition (Diagnoses), MedicationRequest, 
+     and DiagnosticReport FHIR resources into transient working memory.
+   - Automated vectorization and cross-referencing against local Tri-Store Hybrid GraphRAG 
+     (Reciprocal Rank Fusion k=60 across Qdrant dense, sparse BM25, and graph indices).
+
+B. Enterprise LLMOps Evaluation Pipeline:
+   - Integration of Ragas / TruLens continuous evaluation harnesses into CI/CD deployment pipelines.
+   - Automated evaluation metrics executing on every inference batch:
+     * Faithfulness Score (grounding check against retrieved NCCN evidence chunks).
+     * Answer Relevance (semantic embedding distance between query and response).
+     * Context Precision (ranking efficacy of retrieved graph paths and vector nodes).
+
+C. Compliance & Security (HIPAA / HITECH / DISHA):
+   - AES-256 encryption at rest (AWS KMS managed keys); TLS 1.3 encryption in transit.
+   - Comprehensive append-only audit logging of all clinical decisions, user interactions, 
+     and prompt/response hashes stored in immutable CloudTrail / PostgreSQL ledgers.
+
+--------------------------------------------------------------------------------
+3. COMPONENT 2: NEO4J ENTERPRISE CLUSTER & UNIFIED MEDICAL ONTOLOGIES
+--------------------------------------------------------------------------------
+A. Database Scaling & Topology:
+   - Migration from in-memory NetworkX to a managed Neo4j Enterprise Causal Cluster 
+     (3 Core servers with Raft consensus, 2 Read Replicas deployed across multi-AZ VPC).
+   - Dynamic Cypher query generation via fine-tuned Text-to-Cypher LLM layer using few-shot 
+     schema injection and strict parameter sanitization.
+
+B. Ontology Integration Pipeline:
+   - Ingestion and normalization of 15M+ nodes and 45M+ relationships spanning:
+     * UMLS (Unified Medical Language System) Concept Unique Identifiers (CUIs).
+     * SNOMED-CT (Clinical Findings and Procedures).
+     * RxNorm (Standardized Nomenclature for Clinical Drugs).
+     * ClinVar & CIViC (Clinically Interpreted Variants and Evidence Tiers).
+     * NCIT (National Cancer Institute Thesaurus).
+
+--------------------------------------------------------------------------------
+4. COMPONENT 3: LANGGRAPH AUTONOMOUS MULTI-AGENT SWARM WITH HITL
+--------------------------------------------------------------------------------
+A. State Management & Persistence:
+   - Re-architecting multi-agent coordination using LangGraph with PostgreSQL checkpointers 
+     (`PostgresSaver`) to guarantee durable, resumable state across long-running clinical sessions.
+
+B. Autonomous Specialist Swarm Nodes:
+   - Triage Node: Deterministic acute clinical red-flag classifier combined with Llama Guard 3.
+   - Genomics Node: Dynamic neoantigen and actionable mutation parser.
+   - Clinical Trial Node: Tool-calling node executing live REST queries against the 
+     ClinicalTrials.gov API v2 (`https://clinicaltrials.gov/api/v2/studies`) filtered by 
+     geographic coordinate, recruitment status, and biomarker inclusion criteria.
+   - Pharmacovigilance Node: Automated FAERS (FDA Adverse Event Reporting System) and RxNorm 
+     cross-matching for severe drug-drug interactions.
+
+C. Human-in-the-Loop (HITL) Validation Gate:
+   - Mandatory interrupt-before-execution (`interrupt_before=["consensus_finalization"]`) 
+     pattern. The autonomous swarm compiles draft consensus recommendations into a clinical 
+     review queue; a licensed attending oncologist must cryptographically sign off via UI 
+     before final transmission to the EHR.
+
+--------------------------------------------------------------------------------
+5. COMPONENT 4: CONTAINERIZED gRPC FEDERATED LEARNING (FLOWER + OPACUS)
+--------------------------------------------------------------------------------
+A. Distributed Node Topology:
+   - Decoupled client-server architecture where Hospital Nodes (e.g., MSKCC, Tata Memorial, Mayo Clinic) 
+     run containerized PyTorch workers communicating securely over mutual TLS (mTLS) gRPC streams 
+     managed by the Flower (`flwr`) federated learning framework.
+
+B. Differential Privacy (DP-SGD via PyTorch Opacus):
+   - Client-side local training executing strict mathematical privacy guarantees:
+     * Per-Sample Gradient Clipping: L2 norm bound threshold $C = 1.0$ applied to individual gradients.
+     * Calibrated Gaussian Noise Addition: $\sigma = 1.2$ noise multiplier added to batched gradients.
+     * Rényi Differential Privacy (RDP) & $(\epsilon, \delta)$-Budget Accounting: Continuous tracking 
+     of cumulative privacy expenditure across training rounds, halting aggregation once $\epsilon \le 1.20$ 
+     and $\delta = 10^{-5}$ limits are reached.
+
+--------------------------------------------------------------------------------
+6. COMPONENT 5: MONAI 3D DICOM SEGMENTATION & SURVIVAL ANALYSIS
+--------------------------------------------------------------------------------
+A. Computer Vision Pipeline (MONAI Framework):
+   - Integration of Medical Open Network for AI (MONAI) pipelines for native 3D volumetric DICOM parsing.
+   - U-Net semantic segmentation models trained on BraTS / LIDC-IDRI datasets for automated tumor boundary 
+     delineation, volumetric growth tracking, and RECIST 1.1 response evaluation.
+
+B. Statistical Prognosis Modeling:
+   - Transition from heuristic scoring to validated Cox Proportional Hazards and Kaplan-Meier 
+     survival regression estimators trained on massive cohorts from the SEER (Surveillance, Epidemiology, 
+     and End Results) database and TCGA (The Cancer Genome Atlas), outputting 1-, 3-, and 5-year 
+     probability curves.
+
+================================================================================
+END OF TECHNICAL SPECIFICATION — ONCOGRAPH AI ENTERPRISE BLUEPRINT
+================================================================================

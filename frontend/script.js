@@ -1,7 +1,10 @@
 // ===== CONFIGURATION =====
-const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? "http://localhost:8000"
-    : (window.location.origin.includes('onrender.com') ? window.location.origin : "https://cancer-awareness-and-healthcare-chatbot-n2wy.onrender.com");
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+
+const API_URL = isLocal 
+    ? "http://127.0.0.1:8000" 
+    : "https://cancer-awareness-and-healthcare-chatbot-n2wy.onrender.com";
+
 const MAX_CHARS = 500;
 
 // ===== DOM REFERENCES =====
@@ -52,18 +55,23 @@ let pendingImageDataUrl = null;
 let currentMode = 'clinical';
 let activePanel = 'chat-panel';
 
-// ===== AUTH STATE =====
-let currentUser = null;    // { username, email, full_name, specialty, plan, ... }
-let authToken = null;      // JWT string
-
-// Plan hierarchy for gating
-const PLAN_LEVELS = { free: 0, clinical: 1, enterprise: 2 };
+// ===== UNRESTRICTED GUEST STATE (Enterprise Tier) =====
+let currentUser = {
+    username: "guest_clinician",
+    email: "guest@oncograph.ai",
+    full_name: "Guest Clinician",
+    specialty: "Oncology",
+    institution: "Global Medical Center",
+    role: "admin",
+    plan: "enterprise"
+};
+let authToken = "bypass_token_active";
 
 // ===== INIT =====
 function init() {
     loadSessions();
     loadTheme();
-    setupAuth();
+    setupAuthBypass();
     startNewSession();
     setupParticles();
     setupTextareaAutoResize();
@@ -74,7 +82,6 @@ function init() {
     setupMLPanel();
     updateStats();
     loadGraphStats();
-    setupPasswordStrengthMeter();
     checkBackendHealth();
     setInterval(checkBackendHealth, 30000);
 }
@@ -98,210 +105,28 @@ async function checkBackendHealth() {
 }
 
 // ══════════════════════════════════════════════════════
-// AUTH SYSTEM — JWT-based
+// AUTH BYPASS — Always Unlocked Enterprise Session
 // ══════════════════════════════════════════════════════
 
 function getAuthHeaders() {
-    if (!authToken) return { 'Content-Type': 'application/json' };
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
     };
 }
 
-function decodeJwt(token) {
-    try {
-        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        return JSON.parse(atob(base64));
-    } catch { return null; }
-}
-
-function isTokenExpired(token) {
-    const payload = decodeJwt(token);
-    if (!payload || !payload.exp) return true;
-    return Date.now() / 1000 > payload.exp;
-}
-
-function scheduleTokenExpiryCheck() {
-    const payload = decodeJwt(authToken);
-    if (!payload || !payload.exp) return;
-    const msUntilExpiry = (payload.exp * 1000) - Date.now();
-    if (msUntilExpiry > 0) {
-        // Warn 5 min before expiry
-        const warnMs = msUntilExpiry - 5 * 60 * 1000;
-        if (warnMs > 0) {
-            setTimeout(() => {
-                showNotifBanner('Your session expires in 5 minutes. <span class="nb-link" onclick="document.getElementById(\'logout-btn\').click()">Re-login</span>', 'warning');
-            }, warnMs);
-        }
-        setTimeout(() => {
-            showToast('Session expired. Please login again.', 'error');
-            doLogout();
-        }, msUntilExpiry);
-    }
-}
-
-function setupAuth() {
+function setupAuthBypass() {
     const authOverlay = document.getElementById('auth-overlay');
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
-    const forgotForm = document.getElementById('forgot-form');
-    const logoutBtn = document.getElementById('logout-btn');
-    const userChipBtn = document.getElementById('user-chip-btn');
+    if (authOverlay) authOverlay.classList.remove('active');
+    
+    updateHeaderAuthButton(currentUser);
+    updatePlanGates('enterprise');
+    renderUserChip(currentUser);
 
-    // ── Check persisted session ──
-    const savedToken = localStorage.getItem('onco_token');
-    const savedUser = localStorage.getItem('onco_user');
-
-    if (savedToken && savedUser && !isTokenExpired(savedToken)) {
-        authToken = savedToken;
-        currentUser = JSON.parse(savedUser);
-        if (authOverlay) authOverlay.classList.remove('active');
-        onLoginSuccess(currentUser, false);
-    } else {
-        localStorage.removeItem('onco_token');
-        localStorage.removeItem('onco_user');
-        if (authOverlay) authOverlay.classList.remove('active'); // Never block screen on startup
-        updateHeaderAuthButton(null);
-    }
-
-    window.openAuthModal = function() {
-        const overlay = document.getElementById('auth-overlay');
-        if (overlay) overlay.classList.add('active');
-    };
-    window.closeAuthModal = function() {
-        const overlay = document.getElementById('auth-overlay');
-        if (overlay) overlay.classList.remove('active');
-    };
-
-    async function performLogin(username, password, rememberMe = true) {
-        setAuthMsg('', '');
-        setAuthBtnLoading('login-btn', true, 'Authorizing...');
-
-        try {
-            const resp = await fetch(API_URL + '/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, remember_me: rememberMe })
-            });
-            let data = {};
-            try {
-                data = await resp.json();
-            } catch {
-                data = { success: false, message: `Server error (${resp.status}). If Render server is starting, wait ~15s and retry.` };
-            }
-
-            if (data.success) {
-                authToken = data.access_token;
-                currentUser = data.user;
-                localStorage.setItem('onco_token', authToken);
-                localStorage.setItem('onco_user', JSON.stringify(currentUser));
-                if (authOverlay) authOverlay.classList.remove('active');
-                onLoginSuccess(currentUser, false);
-            } else {
-                setAuthMsg(data.detail || data.message || 'Login failed. Please verify credentials.', 'error');
-            }
-        } catch {
-            setAuthMsg('Connection error: Cannot reach the backend API. If Render is sleeping on the free tier, please wait ~20 seconds and click Authorize again.', 'error');
-        } finally {
-            setAuthBtnLoading('login-btn', false, '&#x1F511; Authorize Access');
-        }
-    }
-
-    // ── Quick Demo Button & Admin Fill ──
-    window.loginAsDemo = function() {
-        const u = document.getElementById('login-username');
-        const p = document.getElementById('login-password');
-        if (u) u.value = 'demo';
-        if (p) p.value = 'demo123';
-        performLogin('demo', 'demo123', true);
-    };
-
-    const quickDemoBtn = document.getElementById('quick-demo-btn');
-    if (quickDemoBtn) {
-        quickDemoBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.loginAsDemo();
-        });
-    }
-
-    window.fillAdminCredentials = function() {
-        const u = document.getElementById('login-username');
-        const p = document.getElementById('login-password');
-        if (u) u.value = 'agnivaghosh2006@gmail.com';
-        if (p) p.value = 'master_override';
-        performLogin('agnivaghosh2006@gmail.com', 'master_override', true);
-    };
-
-    // ── Login form submit ──
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('login-username').value.trim();
-        const password = document.getElementById('login-password').value;
-        const rememberMe = document.getElementById('remember-me').checked;
-        await performLogin(username, password, rememberMe);
-    });
-
-    // ── Register form submit ──
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('reg-username').value.trim();
-        const email = document.getElementById('reg-email').value.trim();
-        const password = document.getElementById('reg-password').value;
-        const fullName = document.getElementById('reg-fullname').value.trim();
-        const specialty = document.getElementById('reg-specialty').value;
-        const institution = document.getElementById('reg-institution').value.trim();
-        const role = document.getElementById('reg-role').value;
-
-        setAuthMsg('', '');
-        setAuthBtnLoading('register-btn', true, 'Creating account...');
-
-        try {
-            const resp = await fetch(API_URL + '/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password, full_name: fullName, specialty, institution, role })
-            });
-            let data = {};
-            try {
-                data = await resp.json();
-            } catch {
-                data = { success: false, message: `Server error (${resp.status}). If Render is cold-starting, please retry shortly.` };
-            }
-
-            if (data.success) {
-                setAuthMsg(data.message + ' Please sign in.', 'success');
-                setTimeout(() => switchAuthTab('login'), 1500);
-            } else {
-                setAuthMsg(data.message || 'Registration failed.', 'error');
-            }
-        } catch {
-            setAuthMsg('Connection error: Cannot reach the backend API. Please retry in a few moments.', 'error');
-        } finally {
-            setAuthBtnLoading('register-btn', false, '&#x1F195; Create Clinical Account');
-        }
-    });
-
-    // ── Forgot password ──
-    forgotForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const username = document.getElementById('forgot-username').value.trim();
-        if (!username) return;
-        // Generate a fake reset token (UI only)
-        const fakeToken = btoa(username + ':' + Date.now()).replace(/=/g, '').substring(0, 32);
-        document.getElementById('reset-token-value').textContent = fakeToken;
-        document.getElementById('reset-token-box').style.display = 'block';
-    });
-
-    // ── Logout ──
-    logoutBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to log out?')) doLogout();
-    });
-
-    // ── User chip opens profile ──
-    if (userChipBtn) {
-        userChipBtn.addEventListener('click', openProfileModal);
-    }
+    // Dummy stubs to prevent reference errors
+    window.openAuthModal = function() {};
+    window.closeAuthModal = function() {};
+    window.switchAuthTab = function() {};
 }
 
 function updateHeaderAuthButton(user) {
@@ -309,115 +134,23 @@ function updateHeaderAuthButton(user) {
     const label = document.getElementById('header-auth-label');
     const icon = document.getElementById('header-auth-icon');
     if (!btn || !label) return;
-    if (user) {
-        label.textContent = (user.full_name ? user.full_name.split(' ')[0] : user.username) || 'Clinician';
-        if (icon) icon.textContent = '👤';
-        btn.onclick = () => openProfileModal();
-    } else {
-        label.textContent = 'Sign In';
-        if (icon) icon.textContent = '🔑';
-        btn.onclick = () => window.openAuthModal();
-    }
+    label.textContent = user.full_name.split(' ')[0];
+    if (icon) icon.textContent = '👤';
+    btn.onclick = () => openProfileModal();
 }
-
-function onLoginSuccess(user) {
-    scheduleTokenExpiryCheck();
-    renderUserChip(user);
-    updateHeaderAuthButton(user);
-    updatePlanGates(user.plan || 'free');
-    refreshUsageBar();
-    loadGraphStats();
-    showToast(`Welcome${user.full_name ? ', ' + user.full_name.split(' ')[0] : ''}! You're on the ${capitalise(user.plan || 'free')} plan.`, 'success');
-}
-
-function doLogout() {
-    authToken = null;
-    currentUser = null;
-    localStorage.removeItem('onco_token');
-    localStorage.removeItem('onco_user');
-    const authOverlay = document.getElementById('auth-overlay');
-    if (authOverlay) authOverlay.classList.remove('active');
-    updateHeaderAuthButton(null);
-    document.getElementById('login-form')?.reset();
-    document.getElementById('register-form')?.reset();
-    const userChip = document.getElementById('user-chip-btn');
-    if (userChip) userChip.style.display = 'none';
-    const usageBar = document.getElementById('sidebar-usage-bar');
-    if (usageBar) usageBar.style.display = 'none';
-    const nudge = document.getElementById('upgrade-nudge');
-    if (nudge) nudge.style.display = 'none';
-    updatePlanGates('free');
-    showToast('Logged out successfully', 'info');
-}
-
-function setAuthMsg(msg, type) {
-    const el = document.getElementById('auth-msg');
-    el.textContent = msg;
-    el.className = 'auth-msg' + (msg && type ? ' ' + type : '');
-}
-
-function setAuthBtnLoading(id, loading, html) {
-    const btn = document.getElementById(id);
-    if (!btn) return;
-    btn.disabled = loading;
-    btn.innerHTML = loading ? '⏳ ' + html : html;
-}
-
-// Auth tab switcher
-window.switchAuthTab = function(tab) {
-    ['login', 'register', 'forgot'].forEach(t => {
-        document.getElementById('auth-tab-' + t)?.classList.toggle('active', t === tab);
-        document.getElementById('auth-pane-' + t)?.classList.toggle('active', t === tab);
-    });
-    setAuthMsg('', '');
-};
-
-// ══════════════════════════════════════════════════════
-// PLAN GATES — show/hide lock overlays & badges
-// ══════════════════════════════════════════════════════
 
 function updatePlanGates(plan) {
-    const lvl = PLAN_LEVELS[plan] ?? 0;
-
-    // Graph: clinical+
-    const graphLocked = lvl < PLAN_LEVELS.clinical;
-    setOverlay('lock-overlay-graph', graphLocked);
-    setLockPip('lock-graph', graphLocked);
-
-    // ML: clinical+
-    const mlLocked = lvl < PLAN_LEVELS.clinical;
-    setOverlay('lock-overlay-ml', mlLocked);
-    setLockPip('lock-ml', mlLocked);
-
-    // Tumor board & Federated: enterprise only
-    const entLocked = lvl < PLAN_LEVELS.enterprise;
-    setOverlay('lock-overlay-tumor', entLocked);
-    setLockPip('lock-tumor', entLocked);
-    setOverlay('lock-overlay-federated', entLocked);
-    setLockPip('lock-federated', entLocked);
-
-    // Show upgrade nudge for free users
+    // Hide all lock overlays since everything is free & open
+    ['lock-overlay-graph', 'lock-overlay-ml', 'lock-overlay-tumor', 'lock-overlay-federated'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    ['lock-graph', 'lock-ml', 'lock-tumor', 'lock-federated'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
     const nudge = document.getElementById('upgrade-nudge');
-    if (nudge) nudge.style.display = plan === 'free' ? 'block' : 'none';
-}
-
-function setOverlay(id, show) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = show ? 'flex' : 'none';
-}
-
-function setLockPip(id, show) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = show ? 'inline' : 'none';
-}
-
-function checkPlanGate(requiredPlan) {
-    if (!currentUser) return false;
-    const userLevel = PLAN_LEVELS[currentUser.plan || 'free'] ?? 0;
-    const reqLevel = PLAN_LEVELS[requiredPlan] ?? 0;
-    if (userLevel >= reqLevel) return true;
-    openSubscriptionModal();
-    return false;
+    if (nudge) nudge.style.display = 'none';
 }
 
 // ══════════════════════════════════════════════════════
@@ -428,62 +161,31 @@ function renderUserChip(user) {
     const chip = document.getElementById('user-chip-btn');
     if (!chip) return;
 
-    const initials = getInitials(user.full_name || user.username);
-    const color = user.avatar_color || '#6366f1';
-    const plan = user.plan || 'free';
-
-    document.getElementById('sidebar-avatar').textContent = initials;
-    document.getElementById('sidebar-avatar').style.background = color;
-    document.getElementById('sidebar-username').textContent = user.full_name || user.username;
+    document.getElementById('sidebar-avatar').textContent = 'GC';
+    document.getElementById('sidebar-avatar').style.background = '#6366f1';
+    document.getElementById('sidebar-username').textContent = user.full_name;
 
     const planBadge = document.getElementById('sidebar-plan-badge');
-    planBadge.textContent = capitalise(plan);
-    planBadge.className = 'plan-badge ' + plan;
+    planBadge.textContent = 'Enterprise';
+    planBadge.className = 'plan-badge enterprise';
 
     chip.style.display = 'flex';
-    document.getElementById('sidebar-usage-bar').style.display = 'block';
-}
-
-function getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    const usageBar = document.getElementById('sidebar-usage-bar');
+    if (usageBar) usageBar.style.display = 'block';
+    
+    const countEl = document.getElementById('uqb-count');
+    if (countEl) countEl.textContent = 'Unlimited Access';
 }
 
 function capitalise(s) {
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-async function refreshUsageBar() {
-    if (!authToken || !currentUser) return;
-    try {
-        const resp = await fetch(API_URL + '/auth/usage', { headers: getAuthHeaders() });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (!data.success) return;
-        const u = data.usage;
-
-        // Sidebar usage bar
-        const pct = u.daily_quota === 999999 ? 0 : Math.min(100, (u.queries_today / u.daily_quota) * 100);
-        const fill = document.getElementById('uqb-fill');
-        const countEl = document.getElementById('uqb-count');
-        if (fill) {
-            fill.style.width = pct + '%';
-            fill.className = 'uqb-fill' + (pct >= 80 ? ' danger' : '');
-        }
-        if (countEl) {
-            countEl.textContent = u.daily_quota === 999999 ? `${u.queries_today} used` : `${u.queries_today}/${u.daily_quota}`;
-        }
-    } catch {}
-}
-
 // ══════════════════════════════════════════════════════
-// PROFILE MODAL
+// PROFILE MODAL (View-only for guest)
 // ══════════════════════════════════════════════════════
 
 window.openProfileModal = function() {
-    if (!currentUser) return;
     const modal = document.getElementById('profile-modal');
     modal.classList.add('active');
     loadProfileData();
@@ -497,382 +199,53 @@ window.closeProfileModal = function() {
 window.switchProfileTab = function(tab) {
     document.querySelectorAll('.profile-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-ptab') === tab));
     document.querySelectorAll('.profile-pane').forEach(p => p.classList.toggle('active', p.id === 'ptab-' + tab));
-
-    if (tab === 'usage') loadUsageTab();
-    if (tab === 'activity') loadActivityTab();
-    if (tab === 'sessions') loadSessionsTab();
 };
 
 function loadProfileData() {
-    if (!currentUser) return;
-    document.getElementById('pf-fullname').value = currentUser.full_name || '';
-    document.getElementById('pf-username').value = currentUser.username || '';
-    document.getElementById('pf-email').value = currentUser.email || '';
-    document.getElementById('pf-specialty').value = currentUser.specialty || '';
-    document.getElementById('pf-institution').value = currentUser.institution || '';
+    document.getElementById('pf-fullname').value = currentUser.full_name;
+    document.getElementById('pf-username').value = currentUser.username;
+    document.getElementById('pf-email').value = currentUser.email;
+    document.getElementById('pf-specialty').value = currentUser.specialty;
+    document.getElementById('pf-institution').value = currentUser.institution;
 
-    // Header
-    const initials = getInitials(currentUser.full_name || currentUser.username);
-    const color = currentUser.avatar_color || '#6366f1';
     const avatar = document.getElementById('profile-avatar-large');
-    avatar.textContent = initials;
-    avatar.style.background = color;
+    avatar.textContent = 'GC';
+    avatar.style.background = '#6366f1';
 
-    document.getElementById('profile-header-name').textContent = currentUser.full_name || currentUser.username;
-    document.getElementById('profile-role-tag').textContent = capitalise(currentUser.role || 'clinician');
+    document.getElementById('profile-header-name').textContent = currentUser.full_name;
+    document.getElementById('profile-role-tag').textContent = 'Administrator';
 
     const pb = document.getElementById('profile-plan-badge');
-    pb.textContent = capitalise(currentUser.plan || 'free');
-    pb.className = 'plan-badge ' + (currentUser.plan || 'free');
-
-    const since = currentUser.created_at ? new Date(currentUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '—';
-    document.getElementById('profile-since').textContent = 'Since ' + since;
+    pb.textContent = 'Enterprise';
+    pb.className = 'plan-badge enterprise';
+    document.getElementById('profile-since').textContent = 'Open Access Mode';
 }
 
-window.saveProfileInfo = async function() {
-    if (!authToken) return;
-    const btn = document.getElementById('pf-save-info-btn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
-
-    const body = {
-        full_name: document.getElementById('pf-fullname').value.trim(),
-        email: document.getElementById('pf-email').value.trim(),
-        specialty: document.getElementById('pf-specialty').value.trim(),
-        institution: document.getElementById('pf-institution').value.trim(),
-    };
-
-    try {
-        const resp = await fetch(API_URL + '/auth/profile/update', {
-            method: 'PATCH',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(body)
-        });
-        const data = await resp.json();
-        if (data.success) {
-            currentUser = { ...currentUser, ...data.user };
-            localStorage.setItem('onco_user', JSON.stringify(currentUser));
-            renderUserChip(currentUser);
-            loadProfileData();
-            showPfMsg('pf-info-msg', 'Profile updated successfully!', 'success');
-        } else {
-            showPfMsg('pf-info-msg', data.detail || 'Update failed.', 'error');
-        }
-    } catch {
-        showPfMsg('pf-info-msg', 'Server error. Try again.', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Save Changes';
-    }
+window.saveProfileInfo = function() {
+    showToast('Profile updated locally.', 'success');
 };
 
-window.changePassword = async function() {
-    if (!authToken) return;
-    const oldPw = document.getElementById('pf-old-pw').value;
-    const newPw = document.getElementById('pf-new-pw').value;
-    const confirmPw = document.getElementById('pf-confirm-pw').value;
-
-    if (newPw !== confirmPw) { showPfMsg('pf-security-msg', 'New passwords do not match.', 'error'); return; }
-    if (newPw.length < 6) { showPfMsg('pf-security-msg', 'New password must be at least 6 characters.', 'error'); return; }
-
-    try {
-        const resp = await fetch(API_URL + '/auth/profile/change-password', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ old_password: oldPw, new_password: newPw })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            showPfMsg('pf-security-msg', 'Password changed successfully!', 'success');
-            document.getElementById('pf-old-pw').value = '';
-            document.getElementById('pf-new-pw').value = '';
-            document.getElementById('pf-confirm-pw').value = '';
-        } else {
-            showPfMsg('pf-security-msg', data.detail || 'Password change failed.', 'error');
-        }
-    } catch {
-        showPfMsg('pf-security-msg', 'Server error. Try again.', 'error');
-    }
+window.changePassword = function() {
+    showToast('Authentication is disabled in open access mode.', 'info');
 };
-
-async function loadUsageTab() {
-    if (!authToken) return;
-    try {
-        const resp = await fetch(API_URL + '/auth/usage', { headers: getAuthHeaders() });
-        const data = await resp.json();
-        if (!data.success) return;
-        const u = data.usage;
-
-        document.getElementById('pf-queries-today').textContent = u.queries_today;
-        document.getElementById('pf-queries-month').textContent = u.queries_month;
-        document.getElementById('pf-daily-remaining').textContent = u.daily_quota === 999999 ? '∞' : u.daily_remaining;
-        document.getElementById('pf-monthly-remaining').textContent = u.monthly_quota === 999999 ? '∞' : u.monthly_remaining;
-
-        const dailyPct = u.daily_quota === 999999 ? 5 : Math.min(100, (u.queries_today / u.daily_quota) * 100);
-        const monthlyPct = u.monthly_quota === 999999 ? 5 : Math.min(100, (u.queries_month / u.monthly_quota) * 100);
-
-        const dailyBar = document.getElementById('pf-daily-bar');
-        dailyBar.style.width = dailyPct + '%';
-        dailyBar.className = 'uqb-fill-lg' + (dailyPct >= 80 ? ' danger' : '');
-
-        const monthlyBar = document.getElementById('pf-monthly-bar');
-        monthlyBar.style.width = monthlyPct + '%';
-        monthlyBar.className = 'uqb-fill-lg' + (monthlyPct >= 80 ? ' danger' : '');
-
-        document.getElementById('pf-daily-label').textContent = u.daily_quota === 999999 ? `${u.queries_today} / ∞` : `${u.queries_today} / ${u.daily_quota}`;
-        document.getElementById('pf-monthly-label').textContent = u.monthly_quota === 999999 ? `${u.queries_month} / ∞` : `${u.queries_month} / ${u.monthly_quota}`;
-    } catch {}
-}
-
-async function loadActivityTab() {
-    if (!authToken) return;
-    const container = document.getElementById('pf-activity-content');
-    try {
-        const resp = await fetch(API_URL + '/auth/activity', { headers: getAuthHeaders() });
-        const data = await resp.json();
-        if (!data.success || data.activity.length === 0) {
-            container.innerHTML = '<div class="activity-empty">No activity recorded yet.</div>';
-            return;
-        }
-        container.innerHTML = `
-            <table class="activity-table">
-                <thead><tr><th>#</th><th>Endpoint</th><th>Time</th></tr></thead>
-                <tbody>
-                    ${data.activity.map((a, i) => `
-                        <tr>
-                            <td>${i + 1}</td>
-                            <td><code>${escapeHtml(a.endpoint)}</code></td>
-                            <td>${new Date(a.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>`;
-    } catch {
-        container.innerHTML = '<div class="activity-empty">Failed to load activity.</div>';
-    }
-}
-
-async function loadSessionsTab() {
-    if (!authToken) return;
-    const container = document.getElementById('pf-sessions-content');
-    try {
-        const resp = await fetch(API_URL + '/auth/sessions', { headers: getAuthHeaders() });
-        const data = await resp.json();
-        if (!data.success || data.sessions.length === 0) {
-            container.innerHTML = '<div class="activity-empty">No sessions recorded.</div>';
-            return;
-        }
-        container.innerHTML = data.sessions.map((s, i) => `
-            <div class="session-item">
-                <div class="session-dot"></div>
-                <span>Login ${i === 0 ? '(Most Recent)' : ''}</span>
-                <span>${new Date(s.login_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-        `).join('');
-    } catch {
-        container.innerHTML = '<div class="activity-empty">Failed to load sessions.</div>';
-    }
-}
-
-window.logoutAllSessions = function() {
-    if (confirm('This will log you out of all devices. Proceed?')) {
-        doLogout();
-    }
-};
-
-function showPfMsg(id, msg, type) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = msg;
-    el.className = 'pf-msg ' + type;
-    setTimeout(() => { el.className = 'pf-msg'; el.textContent = ''; }, 4000);
-}
 
 // ══════════════════════════════════════════════════════
-// SUBSCRIPTION MODAL
+// SUBSCRIPTION MODAL (Bypassed)
 // ══════════════════════════════════════════════════════
 
 window.openSubscriptionModal = function() {
-    const modal = document.getElementById('subscription-modal');
-    modal.classList.add('active');
-    renderPricingCards();
+    showToast('All features are already fully unlocked on the Enterprise tier!', 'success');
 };
-
-window.closeSubscriptionModal = function() {
-    document.getElementById('subscription-modal').classList.remove('active');
-};
-
-function renderPricingCards() {
-    const grid = document.getElementById('plans-grid');
-    const userPlan = currentUser?.plan || 'free';
-
-    const plans = [
-        {
-            id: 'free',
-            name: 'Free',
-            price: '$0',
-            period: '/month',
-            desc: 'Basic cancer Q&A for patients and caregivers',
-            highlights: ['10 AI queries per day', 'Basic cancer chatbot', 'Chat history & export', 'Voice input & TTS'],
-            popular: false,
-        },
-        {
-            id: 'clinical',
-            name: 'Clinical',
-            price: '$49',
-            period: '/month',
-            desc: 'For oncologists & clinical teams',
-            highlights: ['500 AI queries per day', 'Knowledge Graph Explorer', 'ML Prognosis Predictor', 'DICOM image analysis', 'Clinical mode & ICD-10 codes'],
-            popular: true,
-        },
-        {
-            id: 'enterprise',
-            name: 'Enterprise',
-            price: '$199',
-            period: '/month',
-            desc: 'Full platform for hospital networks',
-            highlights: ['Unlimited queries', 'Virtual Tumor Board (4 AI agents)', 'Federated Learning Network', 'All Clinical features', 'Priority support & SLA'],
-            popular: false,
-        },
-    ];
-
-    grid.innerHTML = plans.map(p => {
-        const isCurrent = p.id === userPlan;
-        const isDowngrade = PLAN_LEVELS[p.id] < PLAN_LEVELS[userPlan];
-        let btnClass = 'plan-cta-btn ';
-        let btnText = '';
-        if (isCurrent) { btnClass += 'current-plan'; btnText = '✓ Current Plan'; }
-        else if (isDowngrade) { btnClass += 'outline'; btnText = 'Switch to ' + p.name; }
-        else { btnClass += 'primary'; btnText = '⚡ Upgrade to ' + p.name; }
-
-        return `
-            <div class="plan-card${isCurrent ? ' current' : ''}${p.popular && !isCurrent ? ' popular' : ''}">
-                ${p.popular && !isCurrent ? '<div class="popular-badge">Most Popular</div>' : ''}
-                ${isCurrent ? '<div class="current-badge">✓ Active</div>' : ''}
-                <div class="plan-name">${p.name}</div>
-                <div class="plan-price">${p.price}<span>${p.period}</span></div>
-                <div class="plan-desc">${p.desc}</div>
-                <ul class="plan-features">
-                    ${p.highlights.map(h => `<li>${h}</li>`).join('')}
-                </ul>
-                <button class="${btnClass}" onclick="selectPlan('${p.id}')" ${isCurrent ? 'disabled' : ''}>${btnText}</button>
-            </div>`;
-    }).join('');
-}
-
-window.selectPlan = async function(planId) {
-    if (!authToken || !currentUser) { showToast('Please login to change plan.', 'error'); return; }
-    if (planId === currentUser.plan) return;
-
-    try {
-        const resp = await fetch(API_URL + '/auth/upgrade-plan', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ plan: planId })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            currentUser.plan = planId;
-            localStorage.setItem('onco_user', JSON.stringify(currentUser));
-            renderUserChip(currentUser);
-            updatePlanGates(planId);
-            renderPricingCards();
-            showToast(`Plan changed to ${capitalise(planId)}! New features are now unlocked.`, 'success');
-            // Close after short delay
-            setTimeout(() => closeSubscriptionModal(), 1200);
-        } else {
-            showToast(data.detail || 'Plan change failed.', 'error');
-        }
-    } catch {
-        showToast('Server error. Try again.', 'error');
-    }
-};
+window.closeSubscriptionModal = function() {};
 
 // ══════════════════════════════════════════════════════
-// ONBOARDING STUBS (CLEAN ACCESS)
-// ══════════════════════════════════════════════════════
-window.openOnboarding = function() {};
-window.closeOnboarding = function() {};
-window.finishOnboarding = function() {
-    switchPanel('chat-panel');
-};
-window.selectObOption = function() {};
-window.selectObChip = function() {};
-window.obNext = function() {};
-window.obBack = function() {};
-
-// ══════════════════════════════════════════════════════
-// PASSWORD STRENGTH METER
-// ══════════════════════════════════════════════════════
-
-function setupPasswordStrengthMeter() {
-    const pwInput = document.getElementById('reg-password');
-    if (pwInput) {
-        pwInput.addEventListener('input', () => {
-            updatePwStrength(pwInput.value, 'strength-fill', 'strength-label');
-        });
-    }
-}
-
-window.updatePwStrength = function(pw, fillId, labelId) {
-    const fill = document.getElementById(fillId);
-    const label = document.getElementById(labelId);
-    if (!fill || !label) return;
-
-    let score = 0;
-    if (pw.length >= 6) score++;
-    if (pw.length >= 10) score++;
-    if (/[A-Z]/.test(pw)) score++;
-    if (/[0-9]/.test(pw)) score++;
-    if (/[^A-Za-z0-9]/.test(pw)) score++;
-
-    const levels = [
-        { cls: '', pct: '0%', text: 'Enter password' },
-        { cls: 'weak', pct: '25%', text: 'Weak' },
-        { cls: 'fair', pct: '50%', text: 'Fair' },
-        { cls: 'good', pct: '75%', text: 'Good' },
-        { cls: 'strong', pct: '100%', text: 'Strong' },
-    ];
-    const lvl = pw.length === 0 ? 0 : Math.min(4, score);
-    fill.className = 'strength-bar-fill ' + levels[lvl].cls;
-    fill.style.width = levels[lvl].pct;
-    label.className = 'strength-label ' + levels[lvl].cls;
-    label.textContent = levels[lvl].text;
-};
-
-// ══════════════════════════════════════════════════════
-// NOTIFICATION BANNER
-// ══════════════════════════════════════════════════════
-
-function showNotifBanner(htmlMsg, type = 'info') {
-    const area = document.getElementById('notif-banner-area');
-    if (!area) return;
-    const div = document.createElement('div');
-    div.className = `notif-banner ${type}`;
-    div.innerHTML = htmlMsg;
-    area.appendChild(div);
-    setTimeout(() => div.remove(), 10000);
-}
-
-// ══════════════════════════════════════════════════════
-// NAVIGATION TABS (with plan gating)
+// NAVIGATION TABS
 // ══════════════════════════════════════════════════════
 
 function setupNavTabs() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const panelId = tab.getAttribute('data-panel');
-            const planRequired = tab.getAttribute('data-plan-required');
-
-            if (planRequired && currentUser) {
-                const userLevel = PLAN_LEVELS[currentUser.plan || 'free'] ?? 0;
-                const reqLevel = PLAN_LEVELS[planRequired] ?? 0;
-                if (userLevel < reqLevel) {
-                    // Still switch panel but show lock overlay (already shown by updatePlanGates)
-                    switchPanel(panelId);
-                    return;
-                }
-            }
             switchPanel(panelId);
         });
     });
@@ -889,7 +262,6 @@ function switchPanel(panelId) {
     if (tab) tab.classList.add('active');
 
     activePanel = panelId;
-
     if (inputContainer) {
         inputContainer.style.display = panelId === 'chat-panel' ? '' : 'none';
     }
@@ -1048,13 +420,6 @@ function loadSession(sessionId) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-function deleteSession(sessionId) {
-    delete sessions[sessionId];
-    saveSessions();
-    if (sessionId === currentSessionId) startNewSession();
-    else renderHistory();
-}
-
 // ===== RENDER HISTORY =====
 function renderHistory(filter = '') {
     historyList.innerHTML = '';
@@ -1146,45 +511,23 @@ function formatBotResponse(data) {
         const isRed = data.triage.level === 'RED';
         html += `
             <div class="triage-alert-banner ${isRed ? 'red' : 'yellow'}">
-                <div class="triage-alert-title">${isRed ? '&#x1F6A8; EMERGENCY TRIAGE ALERT' : '&#x26A0;&#xFE0F; CLINICAL ATTENTION RECOMMENDED'}</div>
+                <div class="triage-alert-title">${isRed ? '🚨 EMERGENCY TRIAGE ALERT' : '⚠️ CLINICAL ATTENTION RECOMMENDED'}</div>
                 <div class="triage-alert-action">${escapeHtml(data.triage.action || '')}</div>
             </div>`;
     }
 
-    let answerHtml = data.answer
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n\* /g, '\n<li>')
-        .replace(/\n- /g, '\n<li>');
+    let cleanAnswer = data.answer
+        .replace(/\|/g, '')
+        .replace(/---/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-    if (answerHtml.includes('<li>')) {
-        answerHtml = answerHtml.replace(/((<li>.*?(?:\n|$))+)/g, '<ul>$1</ul>');
-    }
-    answerHtml = answerHtml.replace(/\n/g, '<br>');
+    let answerHtml = cleanAnswer
+        .replace(/\n\* /g, '<br>• ')
+        .replace(/\n- /g, '<br>• ')
+        .replace(/\n/g, '<br>');
 
     html += `<div class="message-text"><p>${answerHtml}</p></div>`;
-
-    if (data.icd10 && data.icd10.length > 0) {
-        html += `<div style="margin-top:8px"><strong>ICD-10 Codes:</strong> ${data.icd10.map(code => `<span class="icd10-badge">${escapeHtml(code)}</span>`).join('')}</div>`;
-    }
-
-    if (data.sources && data.sources.length > 0) {
-        html += `<div class="sources-container"><div class="sources-title">Sources Consulted</div><div>${data.sources.map(s => `<span class="source-tag">${escapeHtml(s)}</span>`).join('')}</div></div>`;
-    }
-
-    if (data.confidence > 0 || data.latency > 0) {
-        html += `<div class="metrics">`;
-        if (data.confidence > 0) html += `<span class="metric-item">&#x1F3AF; ${(data.confidence * 100).toFixed(1)}%</span>`;
-        if (data.latency > 0) html += `<span class="metric-item">&#x23F1;&#xFE0F; ${data.latency.toFixed(2)}s</span>`;
-        if (data.mode) html += `<span class="metric-item">&#x1FA7A; Mode: ${escapeHtml(data.mode)}</span>`;
-        if (data.rate_limit?.remaining !== undefined) html += `<span class="metric-item">&#x1F4CB; ${data.rate_limit.remaining} remaining</span>`;
-        html += `</div>`;
-    }
-
-    if (data.disclaimer) {
-        html += `<span class="disclaimer-badge">&#x26A0;&#xFE0F; ${escapeHtml(data.disclaimer)}</span>`;
-    }
-
-    html += `<button class="msg-tts-btn" onclick="speakText(this)" data-text="${escapeHtml(data.answer)}">&#x1F50A; Read Aloud</button>`;
+    html += `<button class="msg-tts-btn" onclick="speakText(this)" data-text="${escapeHtml(data.answer)}">🔊 Read Aloud</button>`;
 
     return html;
 }
@@ -1234,11 +577,6 @@ window.submitChatMessage = async function(queryOverride) {
         });
         removeTyping();
 
-        if (resp.status === 429) {
-            const errData = await resp.json();
-            showToast(errData.detail || 'Daily quota reached.', 'error');
-            return;
-        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
         const data = await resp.json();
@@ -1254,7 +592,6 @@ window.submitChatMessage = async function(queryOverride) {
         renderHistory();
 
         if (ttsEnabled) speakRaw(data.answer);
-        refreshUsageBar();
 
     } catch (err) {
         removeTyping();
@@ -1335,7 +672,7 @@ function setupSpeechRecognition() {
         userInput.dispatchEvent(new Event('input'));
     };
     rec.onend = () => stopVoiceRecording();
-    rec.onerror = (e) => { console.error('Speech error:', e.error); stopVoiceRecording(); if (e.error !== 'aborted') showToast('Voice error: ' + e.error, 'error'); };
+    rec.onerror = (e) => { stopVoiceRecording(); };
     return rec;
 }
 
@@ -1481,7 +818,6 @@ function setupGraphPanel() {
 }
 
 async function loadGraphStats() {
-    if (!authToken) return;
     try {
         const resp = await fetch(API_URL + '/graph/stats', { headers: getAuthHeaders() });
         if (!resp.ok) return;
@@ -1494,7 +830,7 @@ async function loadGraphStats() {
         `;
         drawGraphVisualization();
     } catch (e) {
-        console.log('Graph stats not available (backend offline)');
+        console.log('Graph stats not available');
     }
 }
 
@@ -1508,25 +844,29 @@ async function runGraphQuery() {
     graphRunBtn.textContent = 'Querying...';
 
     try {
-        const body = { query_type: queryType };
-        if (queryType === 'therapies' || queryType === 'profile' || queryType === 'search' || queryType === 'path') body.mutation_id = entityInput;
-        if (queryType === 'toxicities') body.drug_id = entityInput;
-        if (queryType === 'biomarkers') body.cancer_id = entityInput;
-        if (queryType === 'path') body.cancer_id = entityInput.split(',')[1] || 'NSCLC';
+        const body = { 
+            query_type: queryType,
+            mutation_id: entityInput,
+            drug_id: entityInput,
+            cancer_id: entityInput
+        };
 
         const resp = await fetch(API_URL + '/graph/traverse', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(body)
         });
-        if (resp.status === 403) { showToast('Upgrade to Clinical plan to use Knowledge Graph.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
+        if (!data.cancer_id) data.cancer_id = entityInput;
+        if (!data.mutation_id) data.mutation_id = entityInput;
+        if (!data.drug_id) data.drug_id = entityInput;
+
         renderGraphResults(queryType, data);
     } catch (e) {
         document.getElementById('graph-results').innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Failed to query graph. Is the backend running?</p></div>`;
     } finally {
         graphRunBtn.disabled = false;
-        graphRunBtn.textContent = '&#x1F50D; Traverse Graph';
+        graphRunBtn.textContent = '🔍 Traverse Graph';
     }
 }
 
@@ -1560,7 +900,6 @@ function renderGraphResults(queryType, data) {
 }
 
 async function drawGraphVisualization() {
-    if (!authToken) return;
     const canvas = document.getElementById('graph-canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.parentElement.clientWidth;
@@ -1586,35 +925,6 @@ async function drawGraphVisualization() {
             positions[n.id] = { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
         });
 
-        for (let iter = 0; iter < 10; iter++) {
-            nodes.forEach((a, i) => {
-                nodes.forEach((b, j) => {
-                    if (i >= j) return;
-                    const pa = positions[a.id], pb = positions[b.id];
-                    const dx = pb.x - pa.x, dy = pb.y - pa.y;
-                    const dist = Math.max(Math.hypot(dx, dy), 1);
-                    const force = 800 / (dist * dist);
-                    pa.x -= (dx / dist) * force; pa.y -= (dy / dist) * force;
-                    pb.x += (dx / dist) * force; pb.y += (dy / dist) * force;
-                });
-            });
-            edges.forEach(e => {
-                const pa = positions[e.source], pb = positions[e.target];
-                if (!pa || !pb) return;
-                const dx = pb.x - pa.x, dy = pb.y - pa.y;
-                const dist = Math.hypot(dx, dy);
-                const force = dist * 0.005;
-                pa.x += (dx / dist) * force; pa.y += (dy / dist) * force;
-                pb.x -= (dx / dist) * force; pb.y -= (dy / dist) * force;
-            });
-            nodes.forEach(n => {
-                const p = positions[n.id];
-                p.x += (cx - p.x) * 0.01; p.y += (cy - p.y) * 0.01;
-                p.x = Math.max(30, Math.min(canvas.width - 30, p.x));
-                p.y = Math.max(30, Math.min(canvas.height - 30, p.y));
-            });
-        }
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         edges.forEach(e => {
             const pa = positions[e.source], pb = positions[e.target];
@@ -1624,6 +934,7 @@ async function drawGraphVisualization() {
         });
         nodes.forEach(n => {
             const p = positions[n.id];
+            if (!p) return;
             const color = nodeTypeColors[n.type] || '#94a3b8';
             ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
             ctx.fillStyle = color; ctx.fill();
@@ -1635,7 +946,7 @@ async function drawGraphVisualization() {
         });
     } catch (e) {
         ctx.font = '14px Inter, sans-serif'; ctx.fillStyle = '#64748b'; ctx.textAlign = 'center';
-        ctx.fillText('Knowledge graph visualization (connect backend to render)', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Knowledge graph visualization', canvas.width / 2, canvas.height / 2);
     }
 }
 
@@ -1684,7 +995,6 @@ async function runTumorBoard() {
             headers: getAuthHeaders(),
             body: JSON.stringify({ query, mutations, symptoms, co_medications: coMeds, cancer_type: document.getElementById('tb-cancer-type').value, stage: document.getElementById('tb-stage').value })
         });
-        if (resp.status === 403) { showToast('Tumor Board requires Enterprise plan.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         renderTumorBoardResults(data);
     } catch (e) {
@@ -1752,7 +1062,6 @@ function setupFederatedPanel() {
 }
 
 async function loadFederatedStatus() {
-    if (!authToken) return;
     try {
         const resp = await fetch(API_URL + '/federated/status', { headers: getAuthHeaders() });
         if (!resp.ok) return;
@@ -1793,7 +1102,6 @@ async function runFederatedTraining() {
             headers: getAuthHeaders(),
             body: JSON.stringify({ n_rounds: nRounds, local_epochs: localEpochs })
         });
-        if (resp.status === 403) { showToast('Federated Learning requires Enterprise plan.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         renderFederatedResults(data);
         if (data.hospitals) renderHospitalCards(data.hospitals);
@@ -1836,7 +1144,6 @@ async function runMLPrediction() {
             headers: getAuthHeaders(),
             body: JSON.stringify({ age, tumor_size: tumorSize, lymph_nodes: lymphNodes, biomarker_id: biomarkerId, symptom_count: symptomCount })
         });
-        if (resp.status === 403) { showToast('ML Prognosis requires Clinical plan.', 'error'); openSubscriptionModal(); return; }
         const data = await resp.json();
         if (data.success && data.results) {
             renderMLResults(data.results);

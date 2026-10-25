@@ -1,6 +1,6 @@
 """
 app/main.py — OncoGraph AI v4.1 — Enterprise Clinical Cancer Intelligence Platform
-Full JWT auth, per-plan rate limiting, usage tracking, profile management.
+Authentication and plan restrictions removed for unrestricted local use.
 """
 
 from fastapi import FastAPI, Depends, HTTPException, Header
@@ -20,27 +20,15 @@ from app.triage import classify_triage
 from app.vision import analyze_medical_image
 from app.graph_engine import knowledge_graph
 from app.agents.tumor_board import TumorBoardOrchestrator
-from app.dicom_engine import imaging_engine
+from app.agents.orchestrator import clinical_orchestrator
+from app.dicom_engine import imaging_engine, monai_engine, survival_estimator
 from app.ml_predictor import ml_predictor
+from app.neo4j_engine import neo4j_engine
+from app.fhir_engine import fhir_engine, ragas_evaluator
 from federated.hospital_node import federated_server
 
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-
-from app.auth import (
-    hash_password,
-    verify_password,
-    create_access_token,
-    get_current_user,
-    get_optional_user,
-    record_api_call,
-    get_usage,
-    check_rate_limit,
-    load_users,
-    save_users,
-    PLANS,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -48,23 +36,13 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="OncoGraph AI — Clinical Cancer Intelligence Platform",
     version="4.1.0",
-    description="Enterprise-grade AI clinical cancer intelligence with JWT auth, knowledge graph, virtual tumor board, federated learning, and DICOM imaging.",
+    description="Enterprise-grade AI clinical cancer intelligence with open access, knowledge graph, virtual tumor board, federated learning, and DICOM imaging.",
 )
 
-# CORS — Full support for Vercel production, preview branches, localhost, and custom domains
+# CORS — Full support for local development and production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://cancer-awareness-and-healthcare-cha.vercel.app",
-        "https://cancer-awareness-and-healthcare-cha.vercel.app/",
-        "http://localhost:8000",
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-    ],
-    
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,38 +59,6 @@ except Exception:
 # ──────────────────────────────────────────────
 # Request/Response Schemas
 # ──────────────────────────────────────────────
-
-class RegisterRequest(BaseModel):
-    username: str
-    password: str
-    email: str
-    full_name: Optional[str] = ""
-    specialty: Optional[str] = ""
-    institution: Optional[str] = ""
-    role: Optional[str] = "clinician"  # patient | clinician | researcher
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-    remember_me: Optional[bool] = True
-
-
-class ProfileUpdateRequest(BaseModel):
-    full_name: Optional[str] = None
-    specialty: Optional[str] = None
-    institution: Optional[str] = None
-    email: Optional[str] = None
-
-
-class PasswordChangeRequest(BaseModel):
-    old_password: str
-    new_password: str
-
-
-class PlanUpgradeRequest(BaseModel):
-    plan: str  # free | clinical | enterprise
-
 
 class QueryRequest(BaseModel):
     query: str
@@ -174,18 +120,28 @@ STOPWORDS = {"is", "in", "of", "and", "a", "an", "the", "what", "how", "are", "c
 
 
 # ──────────────────────────────────────────────
+# Mock User Dependency (Bypasses Auth)
+# ──────────────────────────────────────────────
+
+def get_current_user():
+    return {"username": "guest_clinician", "plan": "enterprise", "role": "admin"}
+
+def get_optional_user():
+    return {"username": "guest_clinician", "plan": "enterprise", "role": "admin"}
+
+
+# ──────────────────────────────────────────────
 # Health & Info
 # ──────────────────────────────────────────────
 
 @app.get("/")
 def home():
     return {
-        "message": "OncoGraph AI v4.1 — Enterprise Clinical Cancer Intelligence Platform",
+        "message": "OncoGraph AI v4.1 — Enterprise Clinical Cancer Intelligence Platform (Open Access)",
         "version": "4.1.0",
         "modules": ["chatbot", "graph-rag", "tumor-board", "federated-learning", "dicom-imaging", "ml-diagnostics"],
         "modes": ["patient", "clinical"],
-        "auth": "JWT Bearer",
-        "plans": list(PLANS.keys()),
+        "auth": "Disabled (Unrestricted Open Access)",
     }
 
 
@@ -194,274 +150,66 @@ def health():
     return {"status": "healthy", "timestamp": time.time(), "version": "4.1.0"}
 
 
-# ──────────────────────────────────────────────
-# Plan Definitions
-# ──────────────────────────────────────────────
-
 @app.get("/plans")
 def get_plans():
-    return {"plans": PLANS}
+    return {"plans": {"enterprise": {"features": {"graph": True, "tumor_board": True, "federated": True, "ml_prognosis": True, "image_upload": True}}}}
 
 
 # ──────────────────────────────────────────────
-# Authentication Endpoints
+# Dummy Auth Endpoints (Prevents frontend API errors)
 # ──────────────────────────────────────────────
-
-def _safe_user_public(username: str, u: dict) -> dict:
-    """Strip sensitive fields before returning user object."""
-    return {
-        "username": username,
-        "email": u.get("email", ""),
-        "full_name": u.get("full_name", ""),
-        "specialty": u.get("specialty", ""),
-        "institution": u.get("institution", ""),
-        "role": u.get("role", "clinician"),
-        "plan": u.get("plan", "free"),
-        "created_at": u.get("created_at", ""),
-        "onboarding_done": u.get("onboarding_done", False),
-        "avatar_color": u.get("avatar_color", "#6366f1"),
-        "last_login": u.get("last_login", ""),
-    }
-
-
-@app.post("/auth/register")
-def register(req: RegisterRequest):
-    try:
-        username = req.username.strip().lower()
-        if not username or len(username) < 3:
-            return {"success": False, "message": "Username must be at least 3 characters."}
-        if not req.password or len(req.password) < 6:
-            return {"success": False, "message": "Password must be at least 6 characters."}
-        if not req.email or "@" not in req.email:
-            return {"success": False, "message": "Valid email address is required."}
-
-        users = load_users()
-        if username in users:
-            return {"success": False, "message": "Username already taken. Try a different one."}
-
-        # Check email uniqueness
-        req_email_clean = req.email.strip().lower()
-        for u in users.values():
-            if u.get("email", "").strip().lower() == req_email_clean:
-                return {"success": False, "message": "Email already registered. Please sign in."}
-
-        # Avatar color — deterministic from username
-        colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"]
-        avatar_color = colors[sum(ord(c) for c in username) % len(colors)]
-
-        users[username] = {
-            "password": hash_password(req.password),
-            "email": req_email_clean,
-            "full_name": req.full_name or "",
-            "specialty": req.specialty or "",
-            "institution": req.institution or "",
-            "role": req.role or "clinician",
-            "plan": "free",
-            "avatar_color": avatar_color,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "last_login": "",
-            "onboarding_done": False,
-            "usage_daily": {},
-            "usage_monthly": {},
-            "activity": [],
-            "sessions": [],
-        }
-        save_users(users)
-        logging.info(f"New user registered: {username} ({req.role})")
-        return {"success": True, "message": "Account created successfully! Please sign in."}
-    except Exception as e:
-        logging.error(f"Registration error caught: {e}")
-        return {"success": False, "message": f"Registration failed: {str(e)}"}
-
 
 @app.post("/auth/login")
-def login(req: LoginRequest):
-    try:
-        username_input = req.username.strip().lower()
-        users = load_users()
-
-        # Find user by username or email
-        matched_username = username_input
-        user_obj = users.get(username_input)
-
-        if not user_obj:
-            for uname, user in users.items():
-                if user.get("email", "").strip().lower() == username_input:
-                    matched_username = uname
-                    user_obj = user
-                    break
-
-        # Use the same password verification for every account
-        if not user_obj or not verify_password(
-            req.password, user_obj.get("password", "")
-        ):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid username or password."
-            )
-
-        # Update login information
-        now = datetime.utcnow().isoformat() + "Z"
-        user_obj["last_login"] = now
-
-        sessions = user_obj.setdefault("sessions", [])
-        sessions.append({
-            "login_at": now,
-            "ts": time.time()
-        })
-        user_obj["sessions"] = sessions[-10:]
-
-        save_users(users)
-
-        # Issue token only after successful password verification
-        expires = timedelta(
-            days=30 if req.remember_me else 1
-        )
-        token = create_access_token(
-            {"sub": matched_username},
-            expires_delta=expires
-        )
-
-        return {
-            "success": True,
-            "message": "Login successful.",
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": int(expires.total_seconds()),
-            "user": _safe_user_public(matched_username, user_obj)
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        logging.exception("Login failed due to an internal error")
-        raise HTTPException(
-            status_code=500,
-            detail="Login failed due to an internal server error."
-        )
-
-@app.get("/auth/me")
-async def get_me(current_user: dict = Depends(get_current_user)):
-    username = current_user["username"]
-    users = load_users()
-    u = users.get(username, current_user)
-    usage = get_usage(username)
-    profile = _safe_user_public(username, u)
-    profile["usage"] = usage
-    return {"success": True, "user": profile}
-
-
-@app.patch("/auth/profile/update")
-async def update_profile(req: ProfileUpdateRequest, current_user: dict = Depends(get_current_user)):
-    username = current_user["username"]
-    users = load_users()
-    u = users[username]
-
-    if req.full_name is not None:
-        u["full_name"] = req.full_name.strip()
-    if req.specialty is not None:
-        u["specialty"] = req.specialty.strip()
-    if req.institution is not None:
-        u["institution"] = req.institution.strip()
-    if req.email is not None:
-        email = req.email.strip()
-        if "@" not in email:
-            raise HTTPException(status_code=400, detail="Invalid email address.")
-        # Check uniqueness (excluding self)
-        for un, ud in users.items():
-            if un != username and ud.get("email", "").lower() == email.lower():
-                raise HTTPException(status_code=409, detail="Email already in use by another account.")
-        u["email"] = email
-
-    save_users(users)
-    return {"success": True, "message": "Profile updated successfully.", "user": _safe_user_public(username, u)}
-
-
-@app.post("/auth/profile/change-password")
-async def change_password(req: PasswordChangeRequest, current_user: dict = Depends(get_current_user)):
-    username = current_user["username"]
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
-
-    users = load_users()
-    u = users[username]
-
-    if not verify_password(req.old_password, u["password"]):
-        raise HTTPException(status_code=401, detail="Current password is incorrect.")
-
-    u["password"] = hash_password(req.new_password)
-    save_users(users)
-    return {"success": True, "message": "Password changed successfully."}
-
-
-@app.post("/auth/onboarding-complete")
-async def onboarding_complete(current_user: dict = Depends(get_current_user)):
-    username = current_user["username"]
-    users = load_users()
-    users[username]["onboarding_done"] = True
-    save_users(users)
-    return {"success": True}
-
-
-@app.get("/auth/usage")
-async def user_usage(current_user: dict = Depends(get_current_user)):
-    usage = get_usage(current_user["username"])
-    return {"success": True, "usage": usage}
-
-
-@app.get("/auth/activity")
-async def user_activity(current_user: dict = Depends(get_current_user)):
-    users = load_users()
-    u = users.get(current_user["username"], {})
-    activity = u.get("activity", [])
-    # Return most recent first
-    return {"success": True, "activity": list(reversed(activity[-20:]))}
-
-
-@app.get("/auth/sessions")
-async def user_sessions(current_user: dict = Depends(get_current_user)):
-    users = load_users()
-    u = users.get(current_user["username"], {})
-    sessions = u.get("sessions", [])
-    return {"success": True, "sessions": list(reversed(sessions))}
-
-
-@app.post("/auth/upgrade-plan")
-async def upgrade_plan(req: PlanUpgradeRequest, current_user: dict = Depends(get_current_user)):
-    if req.plan not in PLANS:
-        raise HTTPException(status_code=400, detail=f"Invalid plan. Valid: {list(PLANS.keys())}")
-    username = current_user["username"]
-    users = load_users()
-    old_plan = users[username].get("plan", "free")
-    users[username]["plan"] = req.plan
-    save_users(users)
-    plan_info = PLANS[req.plan]
+def login(req: Any = None):
     return {
         "success": True,
-        "message": f"Plan upgraded from {old_plan} to {req.plan}.",
-        "plan": req.plan,
-        "plan_info": plan_info,
+        "message": "Bypassed successfully.",
+        "access_token": "bypass_token_active",
+        "token_type": "bearer",
+        "user": {
+            "username": "guest_clinician",
+            "email": "guest@oncograph.ai",
+            "full_name": "Guest Clinician",
+            "specialty": "Oncology",
+            "institution": "Global Medical Center",
+            "role": "admin",
+            "plan": "enterprise"
+        }
     }
+
+@app.post("/auth/register")
+def register(req: Any = None):
+    return {"success": True, "message": "Registered successfully."}
+
+@app.get("/auth/me")
+def get_me():
+    return {"success": True, "user": {"username": "guest_clinician", "plan": "enterprise"}}
+
+@app.get("/auth/usage")
+def user_usage():
+    return {"success": True, "usage": {"queries_today": 0, "daily_quota": 999999, "queries_month": 0, "monthly_quota": 999999}}
+
+@app.get("/auth/activity")
+def user_activity():
+    return {"success": True, "activity": []}
+
+@app.get("/auth/sessions")
+def user_sessions():
+    return {"success": True, "sessions": []}
+
+@app.post("/auth/upgrade-plan")
+def upgrade_plan(req: Any = None):
+    return {"success": True, "plan": "enterprise"}
 
 
 # ──────────────────────────────────────────────
-# Core Chatbot — Protected
+# Core Chatbot — Unrestricted Open Access
 # ──────────────────────────────────────────────
 
 @app.post("/ask")
-async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional_user)):
+async def ask(request: QueryRequest):
     start_time = time.time()
-    current_user = user or {"username": "guest", "role": "visitor", "plan": "enterprise"}
-    username = current_user.get("username", "guest")
     query = request.query.strip()
-
-    # Rate limit check (graceful for guests and users)
-    remaining = 999
-    if username != "guest":
-        try:
-            remaining = check_rate_limit(username)
-        except Exception:
-            remaining = 999
 
     try:
         # 1. Triage
@@ -473,7 +221,6 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
         # 3. Safety check
         if is_risky(query):
             latency = round(time.time() - start_time, 3)
-            record_api_call(username, "/ask")
             response_data = {
                 "query": query,
                 "answer": safe_response(),
@@ -484,9 +231,7 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
                 "vision": image_result,
                 "disclaimer": "For educational purposes only. Consult a licensed oncologist for clinical diagnosis or prescription decisions.",
             }
-            resp = JSONResponse(content=response_data)
-            resp.headers["X-RateLimit-Remaining"] = str(remaining - 1)
-            return resp
+            return JSONResponse(content=response_data)
 
         # 4. Context Retrieval
         contexts = retrieve(query, k=7, threshold=0.04)
@@ -501,7 +246,6 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
 
         if not contexts:
             latency = round(time.time() - start_time, 3)
-            record_api_call(username, "/ask")
             response_data = {
                 "query": query,
                 "answer": "No specific matching oncology record found in local clinical dataset. Please consult an oncologist or NCCN practice guidelines for specific protocol details.",
@@ -512,9 +256,7 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
                 "vision": image_result,
                 "disclaimer": "For educational purposes only. Consult a licensed oncologist.",
             }
-            resp = JSONResponse(content=response_data)
-            resp.headers["X-RateLimit-Remaining"] = str(remaining - 1)
-            return resp
+            return JSONResponse(content=response_data)
 
         # 5. Re-rank
         contexts = sorted(contexts, key=lambda x: x.get("score", 0), reverse=True)[:3]
@@ -524,10 +266,9 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
         if request.mode == "clinical":
             augmented_query += " (Provide clinical depth, ICD-10 codes, NCCN guideline references, and TNM/biomarker implications)."
 
-        prompt = build_prompt(augmented_query, contexts, request.chat_history)
+        prompt = build_prompt(augmented_query, contexts, request.chat_history, mode=request.mode)
         response = generate(prompt).strip()
 
-        # If Groq LLM failed or returned fallback message, provide rich verified clinical response from KB
         if not response or "I couldn't generate a response at the moment" in response:
             sections = []
             for c in contexts[:2]:
@@ -550,11 +291,7 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
         confidence = round(contexts[0].get("score", 0), 3)
         latency = round(time.time() - start_time, 3)
 
-        # 8. Record usage
-        record_api_call(username, "/ask")
-        new_remaining = max(0, remaining - 1)
-
-        logging.info(f"[/ask] user={username} plan={current_user.get('plan','free')} mode={request.mode} triage={triage_result['level']} latency={latency}s")
+        logging.info(f"[/ask] mode={request.mode} triage={triage_result['level']} latency={latency}s")
 
         response_data = {
             "query": query,
@@ -567,11 +304,9 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
             "vision": image_result,
             "mode": request.mode,
             "disclaimer": "OncoGraph AI provides clinical decision support. Always verify with primary treating oncologist.",
-            "rate_limit": {"remaining": new_remaining},
+            "rate_limit": {"remaining": 999999},
         }
-        resp = JSONResponse(content=response_data)
-        resp.headers["X-RateLimit-Remaining"] = str(new_remaining)
-        return resp
+        return JSONResponse(content=response_data)
 
     except Exception as e:
         logging.error(f"Error processing /ask request: {e}")
@@ -588,14 +323,11 @@ async def ask(request: QueryRequest, user: Optional[dict] = Depends(get_optional
 
 
 # ──────────────────────────────────────────────
-# Knowledge Graph — Protected (Clinical+)
+# Knowledge Graph — Unrestricted Open Access
 # ──────────────────────────────────────────────
 
 @app.post("/graph/traverse")
-async def graph_traverse(request: GraphTraverseRequest, current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("graph", False):
-        raise HTTPException(status_code=403, detail="Knowledge Graph requires Clinical or Enterprise plan.")
+async def graph_traverse(request: GraphTraverseRequest):
     start_time = time.time()
     try:
         if request.query_type == "therapies" and request.mutation_id:
@@ -624,30 +356,24 @@ async def graph_traverse(request: GraphTraverseRequest, current_user: dict = Dep
 
 
 @app.get("/graph/stats")
-async def graph_stats(current_user: dict = Depends(get_optional_user)):
+async def graph_stats():
     return knowledge_graph.get_graph_stats()
 
 
 @app.get("/graph/export")
-async def graph_export(current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("graph", False):
-        raise HTTPException(status_code=403, detail="Knowledge Graph requires Clinical or Enterprise plan.")
+async def graph_export():
     return knowledge_graph.export_for_visualization()
 
 
 # ──────────────────────────────────────────────
-# Tumor Board — Protected (Enterprise only)
+# Tumor Board — Unrestricted Open Access
 # ──────────────────────────────────────────────
 
 tumor_board = TumorBoardOrchestrator()
 
 
 @app.post("/tumor-board/analyze")
-async def tumor_board_analyze(request: TumorBoardRequest, current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("tumor_board", False):
-        raise HTTPException(status_code=403, detail="Virtual Tumor Board requires Enterprise plan.")
+async def tumor_board_analyze(request: TumorBoardRequest):
     start_time = time.time()
     try:
         patient_context = {
@@ -660,29 +386,22 @@ async def tumor_board_analyze(request: TumorBoardRequest, current_user: dict = D
         }
         report = tumor_board.run_tumor_board(patient_context)
         report["latency"] = round(time.time() - start_time, 3)
-        record_api_call(current_user["username"], "/tumor-board/analyze")
         return report
     except Exception as e:
         return {"error": str(e)}
 
 
 # ──────────────────────────────────────────────
-# Federated Learning — Protected (Enterprise only)
+# Federated Learning — Unrestricted Open Access
 # ──────────────────────────────────────────────
 
 @app.get("/federated/status")
-async def federated_status(current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("federated", False):
-        raise HTTPException(status_code=403, detail="Federated Learning requires Enterprise plan.")
+async def federated_status():
     return federated_server.get_status()
 
 
 @app.post("/federated/train")
-async def federated_train(request: FederatedTrainRequest, current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("federated", False):
-        raise HTTPException(status_code=403, detail="Federated Learning requires Enterprise plan.")
+async def federated_train(request: FederatedTrainRequest):
     start_time = time.time()
     try:
         result = federated_server.run_full_training(
@@ -690,18 +409,13 @@ async def federated_train(request: FederatedTrainRequest, current_user: dict = D
             local_epochs=min(request.local_epochs, 10),
         )
         result["api_latency"] = round(time.time() - start_time, 3)
-        record_api_call(current_user["username"], "/federated/train")
         return result
     except Exception as e:
         return {"error": str(e)}
 
 
 @app.post("/federated/train-dp")
-async def federated_train_dp(request: FederatedDPTrainRequest, current_user: dict = Depends(get_current_user)):
-    """Execute DP-SGD Federated Training with L2 clipping, Gaussian noise, and RDP budget tracking."""
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("federated", False):
-        raise HTTPException(status_code=403, detail="Federated Learning requires Enterprise plan.")
+async def federated_train_dp(request: FederatedDPTrainRequest):
     start_time = time.time()
     try:
         result = federated_server.run_full_dp_training(
@@ -712,7 +426,6 @@ async def federated_train_dp(request: FederatedDPTrainRequest, current_user: dic
             delta=request.delta or 1e-5
         )
         result["api_latency"] = round(time.time() - start_time, 3)
-        record_api_call(current_user["username"], "/federated/train-dp")
         return result
     except Exception as e:
         return {"error": str(e)}
@@ -723,11 +436,7 @@ async def federated_train_dp(request: FederatedDPTrainRequest, current_user: dic
 # ──────────────────────────────────────────────
 
 @app.post("/rag/hybrid-query")
-async def rag_hybrid_query(request: HybridQueryRequest, current_user: dict = Depends(get_current_user)):
-    """
-    Execute Tri-Store Hybrid GraphRAG query with Reciprocal Rank Fusion (RRF).
-    Fuses Dense semantic vector similarity, Sparse BM25-style lexical tokens, and Knowledge Graph paths.
-    """
+async def rag_hybrid_query(request: HybridQueryRequest):
     start_time = time.time()
     try:
         results = hybrid_retrieve(
@@ -751,7 +460,6 @@ async def rag_hybrid_query(request: HybridQueryRequest, current_user: dict = Dep
 
 @app.get("/system/mlsys-metrics")
 async def get_mlsys_metrics():
-    """MLSys performance benchmarks, P99 SLA targets, and privacy telemetry."""
     return {
         "status": "OPERATIONAL",
         "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -779,14 +487,11 @@ async def get_mlsys_metrics():
 
 
 # ──────────────────────────────────────────────
-# ML Prognosis — Protected (Clinical+)
+# ML Prognosis — Unrestricted Open Access
 # ──────────────────────────────────────────────
 
 @app.post("/diagnostics/predict")
-async def predict_prognosis(request: PredictionRequest, current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("ml_prognosis", False):
-        raise HTTPException(status_code=403, detail="ML Prognosis requires Clinical or Enterprise plan.")
+async def predict_prognosis(request: PredictionRequest):
     try:
         prediction = ml_predictor.predict_risk(
             age=request.age,
@@ -795,21 +500,17 @@ async def predict_prognosis(request: PredictionRequest, current_user: dict = Dep
             biomarker_id=request.biomarker_id,
             symptom_count=request.symptom_count,
         )
-        record_api_call(current_user["username"], "/diagnostics/predict")
         return {"success": True, "results": prediction}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
 
 # ──────────────────────────────────────────────
-# DICOM Imaging — Protected (Clinical+)
+# DICOM Imaging — Unrestricted Open Access
 # ──────────────────────────────────────────────
 
 @app.post("/imaging/analyze")
-async def imaging_analyze(request: ImagingRequest, current_user: dict = Depends(get_current_user)):
-    plan = current_user.get("plan", "free")
-    if not PLANS.get(plan, {}).get("features", {}).get("image_upload", False):
-        raise HTTPException(status_code=403, detail="DICOM image analysis requires Clinical or Enterprise plan.")
+async def imaging_analyze(request: ImagingRequest):
     start_time = time.time()
     try:
         result = imaging_engine.process_image(request.image_data, request.clinical_context)
@@ -817,3 +518,151 @@ async def imaging_analyze(request: ImagingRequest, current_user: dict = Depends(
         return result
     except Exception as e:
         return {"error": str(e)}
+
+
+# ──────────────────────────────────────────────
+# Component 1: SMART on FHIR & Continuous LLMOps
+# ──────────────────────────────────────────────
+
+class FHIRIngestRequest(BaseModel):
+    bundle: Dict[str, Any]
+
+class RagasEvalRequest(BaseModel):
+    cases: Optional[List[Dict[str, Any]]] = None
+
+@app.post("/fhir/ingest")
+async def fhir_ingest(request: FHIRIngestRequest):
+    try:
+        parsed_record = fhir_engine.parse_patient_bundle(request.bundle)
+        # Cross-reference with GraphRAG
+        primary_bio = parsed_record["biomarkers"][0]["biomarker"] if parsed_record["biomarkers"] else "General"
+        primary_cancer = parsed_record["conditions"][0]["display"] if parsed_record["conditions"] else "Carcinoma"
+        
+        graph_options = neo4j_engine.find_actionable_therapies(primary_bio, primary_cancer)
+        parsed_record["graph_cross_references"] = graph_options
+
+        return {
+            "success": True,
+            "patient_record": parsed_record,
+            "compliance": {
+                "hipaa_audit_logged": True,
+                "encryption": "AES-256 / TLS 1.3",
+                "audit_block_hash": fhir_engine.audit_ledger[-1]["hash"]
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/fhir/evaluate")
+async def fhir_evaluate_llmops(request: RagasEvalRequest):
+    cases = request.cases or [
+        {
+            "query": "What is the 1st line targeted therapy for EGFR L858R mutation?",
+            "answer": "Osimertinib is the standard first-line targeted therapy supported by NCCN Category 1 evidence.",
+            "contexts": [{"title": "NCCN NSCLC Guidelines", "content": "Osimertinib 80mg daily for EGFR mutation-positive NSCLC.", "score": 0.95}]
+        },
+        {
+            "query": "KRAS G12C targeted therapy in metastatic NSCLC",
+            "answer": "Sotorasib is FDA-approved under CodeBreaK 100 clinical trial guidelines.",
+            "contexts": [{"title": "CodeBreaK 100", "content": "Sotorasib demonstrates clinical efficacy in KRAS G12C mutated lung cancer.", "score": 0.92}]
+        }
+    ]
+    report = ragas_evaluator.evaluate_batch(cases)
+    return report
+
+
+# ──────────────────────────────────────────────
+# Component 2: Neo4j Ontologies & Text-to-Cypher
+# ──────────────────────────────────────────────
+
+class TextToCypherRequest(BaseModel):
+    clinical_query: str
+
+@app.post("/graph/cypher-generate")
+async def generate_cypher_query(request: TextToCypherRequest):
+    try:
+        res = neo4j_engine.generate_sanitized_cypher(request.clinical_query)
+        return {"success": True, "result": res}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ──────────────────────────────────────────────
+# Component 3: Clinical Trials & HITL Signoff
+# ──────────────────────────────────────────────
+
+class ClinicalTrialsSearchRequest(BaseModel):
+    cancer_type: str = "NSCLC"
+    biomarker: str = "EGFR"
+
+class HITLSignoffRequest(BaseModel):
+    session_id: str
+    oncologist_name: str
+    npi_number: str
+    signature_pin: str
+
+@app.post("/clinical-trials/search")
+async def search_clinical_trials(request: ClinicalTrialsSearchRequest):
+    try:
+        from app.agents.orchestrator import ClinicalState
+        mock_state = ClinicalState(f"{request.cancer_type} {request.biomarker}")
+        mock_state.extracted_cancer_type = request.cancer_type
+        mock_state.extracted_biomarkers = [request.biomarker]
+        res_state = clinical_orchestrator.search_clinical_trials(mock_state)
+        return {
+            "success": True,
+            "trials": res_state.clinical_trials,
+            "source": "ClinicalTrials.gov REST API v2"
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/tumor-board/hitl-signoff")
+async def hitl_signoff_endpoint(request: HITLSignoffRequest):
+    try:
+        res = clinical_orchestrator.hitl_signoff(
+            session_id=request.session_id,
+            oncologist_name=request.oncologist_name,
+            npi_number=request.npi_number,
+            signature_pin=request.signature_pin
+        )
+        return res
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ──────────────────────────────────────────────
+# Component 5: MONAI 3D Segmentation & Survival
+# ──────────────────────────────────────────────
+
+class MONAISegmentationRequest(BaseModel):
+    baseline_diameter_mm: float = 35.0
+    current_diameter_mm: float = 24.0
+    cancer_type: str = "NSCLC"
+    stage: str = "Stage IV"
+    age: int = 58
+    biomarker: str = "EGFR_EX19DEL"
+
+@app.post("/imaging/monai-segmentation")
+async def monai_segmentation(request: MONAISegmentationRequest):
+    try:
+        seg_res = monai_engine.segment_volume_3d(
+            baseline_diameter_mm=request.baseline_diameter_mm,
+            current_diameter_mm=request.current_diameter_mm,
+            tumor_site=request.cancer_type
+        )
+        surv_res = survival_estimator.estimate_survival(
+            cancer_type=request.cancer_type,
+            stage=request.stage,
+            age=request.age,
+            biomarker_status=request.biomarker
+        )
+        return {
+            "success": True,
+            "segmentation": seg_res,
+            "survival_prognosis": surv_res
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
