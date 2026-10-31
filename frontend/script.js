@@ -31,14 +31,6 @@ const stopRecordingBtn = document.getElementById('stop-recording-btn');
 const statusIndicator = document.getElementById('status-indicator');
 const toastContainer = document.getElementById('toast-container');
 const particlesCanvas = document.getElementById('particles-canvas');
-const imageUploadBtn = document.getElementById('image-upload-btn');
-const imageFileInput = document.getElementById('image-file-input');
-const imagePreviewContainer = document.getElementById('image-preview-container');
-const imagePreviewImg = document.getElementById('image-preview-img');
-const imagePreviewRemove = document.getElementById('image-preview-remove');
-const lightbox = document.getElementById('lightbox');
-const lightboxImg = document.getElementById('lightbox-img');
-const lightboxClose = document.getElementById('lightbox-close');
 const inputContainer = document.getElementById('input-container');
 
 // ===== STATE =====
@@ -51,21 +43,10 @@ let queryCount = 0;
 let totalConfidence = 0;
 let totalLatency = 0;
 let userMessageCount = 0;
-let pendingImageDataUrl = null;
 let currentMode = 'clinical';
 let activePanel = 'chat-panel';
 
-// ===== UNRESTRICTED GUEST STATE (Enterprise Tier) =====
-let currentUser = {
-    username: "guest_clinician",
-    email: "guest@oncograph.ai",
-    full_name: "Guest Clinician",
-    specialty: "Oncology",
-    institution: "Global Medical Center",
-    role: "admin",
-    plan: "enterprise"
-};
-const authToken = "chatbot";
+// ===== GUEST STATE =====
 
 // ===== INIT =====
 function init() {
@@ -98,13 +79,12 @@ async function checkBackendHealth() {
 }
 
 // ══════════════════════════════════════════════════════
-// AUTH BYPASS — Always Unlocked Enterprise Session
+// Request helpers
 // ══════════════════════════════════════════════════════
 
 function getAuthHeaders() {
     return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        'Content-Type': 'application/json'
     };
 }
 
@@ -405,14 +385,7 @@ window.submitChatMessage = async function(queryOverride) {
     userMessageCount++;
     if (userMessageCount >= 1 && suggestionsOverlay) suggestionsOverlay.classList.add('hidden');
 
-    let imagePayload = null;
     let userHtml = `<p>${escapeHtml(query)}</p>`;
-    if (pendingImageDataUrl) {
-        imagePayload = pendingImageDataUrl;
-        userHtml += `<div class="user-attached-image" onclick="openLightbox('${pendingImageDataUrl}')"><img src="${pendingImageDataUrl}" alt="Attached image"></div>`;
-        pendingImageDataUrl = null;
-        if (imagePreviewContainer) imagePreviewContainer.classList.remove('active');
-    }
     appendMessage('user', userHtml);
 
     if (sessions[currentSessionId] && sessions[currentSessionId].title === 'New Conversation') {
@@ -438,7 +411,7 @@ window.submitChatMessage = async function(queryOverride) {
         const resp = await fetch(API_URL + '/ask', {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ query, chat_history: history, image_data: imagePayload, mode: currentMode })
+            body: JSON.stringify({ query, chat_history: history, mode: currentMode })
         });
         removeTyping();
 
@@ -605,44 +578,5 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// ===== IMAGE UPLOAD =====
-imageUploadBtn.addEventListener('click', () => imageFileInput.click());
-imageFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
-    if (file.size > 5 * 1024 * 1024) { showToast('Image must be under 5MB', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        pendingImageDataUrl = ev.target.result;
-        imagePreviewImg.src = pendingImageDataUrl;
-        imagePreviewContainer.classList.add('active');
-        showToast('Image attached', 'success');
-    };
-    reader.readAsDataURL(file);
-    imageFileInput.value = '';
-});
-imagePreviewRemove.addEventListener('click', () => {
-    pendingImageDataUrl = null;
-    imagePreviewContainer.classList.remove('active');
-    imagePreviewImg.src = '';
-});
-
-// ===== LIGHTBOX =====
-window.openLightbox = function(src) {
-    lightboxImg.src = src;
-    lightbox.classList.add('active');
-};
-lightboxClose.addEventListener('click', () => lightbox.classList.remove('active'));
-lightbox.addEventListener('click', (e) => { if (e.target === lightbox) lightbox.classList.remove('active'); });
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        lightbox.classList.remove('active');
-    }
-});
-
-
-// ═══════════════════════════════════════════════════════
-// KNOWLEDGE GRAPH PANEL
 // ═══════════════════════════════════════════════════════
 init();

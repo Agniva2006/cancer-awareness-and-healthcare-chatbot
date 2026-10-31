@@ -313,14 +313,6 @@ input,textarea,select{font-family:inherit;color:inherit;border:none;background:n
 
 /* Keep the interface focused on chat and conversation history. */
 .nav-tabs,
-#sidebar .sidebar-section + .sidebar-section,
-.usage-quota-bar,
-#user-chip-btn,
-#upgrade-nudge,
-#logout-btn,
-#header-auth-btn,
-#image-upload-btn,
-.image-preview-container,
-.lightbox { display: none !important; }
+#sidebar .sidebar-section + .sidebar-section { display: none !important; }
 .logo-version { display: none; }
 

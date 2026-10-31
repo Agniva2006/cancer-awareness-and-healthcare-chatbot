@@ -33,11 +33,7 @@
                     <span class="nav-tab-icon">&#x1F4AC;</span>
                     <span>Chat</span>
                 </button>
-                <button class="nav-tab" data-panel="ml-panel" id="tab-ml" data-plan-required="clinical">
-                    <span class="nav-tab-icon">&#x1F5A5;&#xFE0F;</span>
-                    <span>ML Prognosis</span>
-                    <span class="lock-pip" id="lock-ml">&#x1F512;</span>
-                </button>
+
             </div>
 
             <button class="new-chat-btn" id="new-chat-btn">
@@ -80,35 +76,8 @@
             </div>
 
             <div class="sidebar-footer">
-                <!-- Usage quota bar -->
-                <div class="usage-quota-bar" id="sidebar-usage-bar" style="display:none">
-                    <div class="uqb-label">
-                        <span>Daily Quota</span>
-                        <span id="uqb-count">0/10</span>
-                    </div>
-                    <div class="uqb-track">
-                        <div class="uqb-fill" id="uqb-fill" style="width:0%"></div>
-                    </div>
-                </div>
-
-                <!-- User chip (shown when logged in) -->
-                <button class="user-chip" id="user-chip-btn" style="display:none" aria-label="Open profile">
-                    <div class="user-avatar" id="sidebar-avatar">?</div>
-                    <div class="user-chip-info">
-                        <div class="user-chip-name" id="sidebar-username">User</div>
-                        <span class="plan-badge free" id="sidebar-plan-badge">Free</span>
-                    </div>
-                    <span style="color:#475569;font-size:0.8rem">&#x2699;&#xFE0F;</span>
-                </button>
-
-                <!-- Upgrade nudge (shown for Free users) -->
-                <div class="upgrade-nudge" id="upgrade-nudge" style="display:none" onclick="openSubscriptionModal()">
-                    &#x26A1; Upgrade
-                </div>
-
                 <button class="footer-btn" id="export-btn">&#x1F4E5; Export Chat</button>
                 <button class="footer-btn" id="theme-toggle-btn">&#x1F319; Dark Mode</button>
-                <button class="footer-btn" id="logout-btn" style="background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.25);color:var(--danger)">&#x1F6AA; Logout</button>
             </div>
         </aside>
 
@@ -137,10 +106,7 @@
                             <span class="control-label">Read</span>
                         </button>
                     </div>
-                    <button class="control-btn" id="header-auth-btn" onclick="openAuthModal()" style="border: 1px solid rgba(99,102,241,0.4); background: rgba(99,102,241,0.15); cursor: pointer;">
-                        <span class="control-icon" id="header-auth-icon">&#x1F511;</span>
-                        <span class="control-label" id="header-auth-label">Sign In</span>
-                    </button>
+
                     <div class="status-indicator" id="status-indicator">
                         <span class="dot"></span>
                         <span class="status-text">Online</span>
@@ -194,19 +160,10 @@
                 <button class="icon-btn" id="stop-recording-btn">&#x23F9;&#xFE0F; Stop</button>
             </div>
 
-            <!-- Image Preview -->
-            <div class="image-preview-container" id="image-preview-container">
-                <div class="image-preview-wrapper">
-                    <img id="image-preview-img" src="" alt="Preview">
-                    <button class="image-preview-remove" id="image-preview-remove">&#x2715;</button>
-                </div>
-                <div class="image-preview-label">&#x1F4CE; Image attached (visual context only)</div>
-            </div>
-
+            <!-- Input -->
             <div class="input-container" id="input-container">
                 <form id="chat-form">
                     <div class="input-wrapper">
-                        <button type="button" class="input-action-btn" id="image-upload-btn" title="Attach image">&#x1F5BC;&#xFE0F;</button>
                         <button type="button" class="input-action-btn" id="voice-mic-btn" title="Voice input">&#x1F3A4;</button>
                         <textarea id="user-input" placeholder="Ask a question about cancer awareness..." rows="1" required></textarea>
                         <button type="submit" id="send-btn" aria-label="Send message">
@@ -218,20 +175,10 @@
                         <span class="powered-by">For general information only. Consult a qualified healthcare professional for medical advice.</span>
                     </div>
                 </form>
-                <input type="file" accept="image/*" class="hidden-file-input" id="image-file-input">
             </div>
         </div>
     </div>
 
-    <!-- Image Lightbox -->
-    <div class="lightbox" id="lightbox">
-        <button class="lightbox-close" id="lightbox-close">&#x2715;</button>
-        <img id="lightbox-img" src="" alt="Full size">
-    </div>
-
-    <!-- ══════════════════════════════════════════
-         AUTH MODAL (Login / Register / Forgot PW)
-    ══════════════════════════════════════════ -->
     <div class="toast-container" id="toast-container"></div>
 
     <script src="script.js?v=20261024_clean_v6"></script>

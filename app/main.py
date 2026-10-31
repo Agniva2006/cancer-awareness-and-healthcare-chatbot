@@ -1,12 +1,13 @@
 ﻿"""Cancer awareness chatbot API."""
 import logging
+import os
 import time
 from typing import Dict, List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.model import generate
 from app.prompts import build_prompt
 from app.rag import retrieve
@@ -14,15 +15,25 @@ from app.safety import is_risky, safe_response
 from app.triage import classify_triage
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="Cancer Awareness Chatbot", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# CORS: allow same-origin frontend plus localhost dev servers.
+# Note: allow_credentials must not be combined with wildcard origins.
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5501,http://127.0.0.1:5501,http://localhost:8000,http://127.0.0.1:8000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 try:
     app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 except Exception:
     pass
 class QueryRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=1000)
     chat_history: Optional[List[Dict[str, str]]] = None
-    mode: Optional[str] = "patient"
+    mode: Optional[str] = Field("patient", pattern="^(patient|clinical)$")
 @app.get("/")
 def home():
     return {"message": "Cancer Awareness Chatbot", "modules": ["chatbot"]}
@@ -40,7 +51,7 @@ async def ask(request: QueryRequest):
     contexts = retrieve(query, k=7, threshold=0.04)
     if contexts:
         contexts = sorted(contexts, key=lambda item: item.get("score", 0), reverse=True)[:3]
-        answer = generate(build_prompt(query, contexts, request.chat_history, mode="patient")).strip()
+        answer = generate(build_prompt(query, contexts, request.chat_history, mode=request.mode or "patient")).strip()
         if not answer or "I couldn't generate a response at the moment" in answer:
             answer = "\n\n".join(f"**{item.get('title', 'Cancer information')}**\n{item.get('content', '')}" for item in contexts[:2])
     else:
