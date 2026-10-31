@@ -1,13 +1,13 @@
+"""Groq LLM service with a multi-model fallback chain."""
+
+import logging
+import threading
+
 from groq import Groq
-import os
-from pathlib import Path
-from dotenv import load_dotenv
 
-# Robust .env loading from project root
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(dotenv_path=BASE_DIR / ".env", override=True)
+from app.core.config import settings
 
-_client = None
+logger = logging.getLogger(__name__)
 
 SYSTEM_MESSAGE = {
     "role": "system",
@@ -15,56 +15,57 @@ SYSTEM_MESSAGE = {
         "You are a safe, clear, and reliable cancer information assistant. "
         "Answer using the provided context only. Avoid hallucination. "
         "Keep answers structured and easy to understand."
-    )
+    ),
 }
 
-# List of models to try in cascading order (primary -> fallbacks)
-FALLBACK_MODELS = [
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "openai/gpt-oss-safeguard-20b",
-    "qwen/qwen3.8-27b"
-]
+_client: Groq | None = None
+_client_lock = threading.Lock()
+
 
 def get_client() -> Groq:
-    """Lazy initialization of Groq client."""
+    """Thread-safe lazy initialization of the Groq client."""
     global _client
     if _client is not None:
         return _client
-
-    api_key = os.getenv("GROQ_API_KEY")
-    if api_key:
-        api_key = api_key.strip().strip('"').strip("'")
-
-    if not api_key:
-        raise ValueError("[ERROR] GROQ_API_KEY not found or empty. Check your .env file.")
-
-    _client = Groq(api_key=api_key)
+    with _client_lock:
+        if _client is None:
+            if not settings.GROQ_API_KEY:
+                raise ValueError(
+                    "GROQ_API_KEY not found or empty. Check your .env file."
+                )
+            _client = Groq(
+                api_key=settings.GROQ_API_KEY, timeout=settings.LLM_TIMEOUT_SECONDS
+            )
     return _client
 
+
 def generate(prompt: str) -> str:
-    """
-    Generate response using Groq LLM with multi-model fallback chain.
-    """
-    client = get_client()
-    
-    for idx, model_name in enumerate(FALLBACK_MODELS):
+    """Generate a response using the first available model in the fallback chain."""
+    try:
+        client = get_client()
+    except ValueError as exc:
+        logger.error("LLM client unavailable: %s", exc)
+        return settings_failures_response()
+
+    for idx, model_name in enumerate(settings.LLM_FALLBACK_MODELS):
         try:
             completion = client.chat.completions.create(
                 model=model_name,
-                messages=[
-                    SYSTEM_MESSAGE,
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.2,
-                max_tokens=1500
+                messages=[SYSTEM_MESSAGE, {"role": "user", "content": prompt}],
+                temperature=settings.LLM_TEMPERATURE,
+                max_tokens=settings.LLM_MAX_TOKENS,
             )
             content = completion.choices[0].message.content
             if content:
                 return content.strip()
-        except Exception as e:
-            print(f"[ERROR] Model attempt {idx + 1} ({model_name}) failed:", e)
+        except Exception as exc:
+            logger.warning("Model attempt %d (%s) failed: %s", idx + 1, model_name, exc)
             continue
 
-    print("[ERROR] All model fallback attempts failed.")
+    logger.error("All model fallback attempts failed.")
+    return settings_failures_response()
+
+
+def settings_failures_response() -> str:
+    """Sentinel answer returned when no LLM could produce a response."""
     return "I couldn't generate a response at the moment. Please try again."

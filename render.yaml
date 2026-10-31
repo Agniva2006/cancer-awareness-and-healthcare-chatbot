@@ -11,5 +11,3 @@ services:
         value: 3.10.12
       - key: GROQ_API_KEY
         sync: false
-      - key: ONCOGRAPH_SECRET_KEY
-        generateValue: true

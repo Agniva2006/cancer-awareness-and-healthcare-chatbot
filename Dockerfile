@@ -11,8 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY . .
+# Copy source code only (secrets come from the environment at runtime)
+COPY app/ ./app/
+COPY data/ ./data/
+COPY frontend/ ./frontend/
+COPY tests/ ./tests/
+COPY pytest.ini setup.cfg ./
 
 # Expose default port
 EXPOSE 8000

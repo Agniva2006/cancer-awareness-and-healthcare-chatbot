@@ -1,7 +1,13 @@
-﻿fastapi
+fastapi
 uvicorn
 pydantic
 scikit-learn
 groq
 python-dotenv
 numpy
+
+# Dev / tooling
+pytest
+httpx
+flake8
+black

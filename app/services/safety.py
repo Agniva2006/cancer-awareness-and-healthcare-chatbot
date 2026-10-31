@@ -20,19 +20,34 @@ def is_risky(query: str) -> bool:
         "what dosage",
         "how much dose",
         "my treatment plan",
-        "recommend medication"
+        "recommend medication",
     ]
 
     if any(phrase in q for phrase in risky_phrases):
         return True
 
     # General educational query exemption (e.g. "what is chemotherapy treatment?")
-    educational_patterns = ["what is ", "what are ", "how does ", "explain ", "overview of "]
-    is_educational = any(q.startswith(pattern) for pattern in educational_patterns) or "symptoms" in q
+    educational_patterns = [
+        "what is ",
+        "what are ",
+        "how does ",
+        "explain ",
+        "overview of ",
+    ]
+    is_educational = (
+        any(q.startswith(pattern) for pattern in educational_patterns)
+        or "symptoms" in q
+    )
 
     if is_educational:
         # Only block if explicit diagnostic/prescription intent is present
-        clinical_intents = ["diagnose me", "prescribe", "my dosage", "my diagnosis", "should i take"]
+        clinical_intents = [
+            "diagnose me",
+            "prescribe",
+            "my dosage",
+            "my diagnosis",
+            "should i take",
+        ]
         if any(intent in q for intent in clinical_intents):
             return True
         return False
@@ -44,11 +59,19 @@ def is_risky(query: str) -> bool:
         "dosage",
         "medication",
         "remedy",
-        "pill"
+        "pill",
     ]
-    personal_intent_words = ["can you diagnose", "prescribe", "what should i take", "give me", "cure me"]
+    personal_intent_words = [
+        "can you diagnose",
+        "prescribe",
+        "what should i take",
+        "give me",
+        "cure me",
+    ]
 
-    if any(k in q for k in risky_keywords) and any(i in q for i in personal_intent_words):
+    if any(k in q for k in risky_keywords) and any(
+        i in q for i in personal_intent_words
+    ):
         return True
 
     return False
@@ -62,4 +85,4 @@ def safe_response() -> str:
         "I can provide general informational guidance about cancer topics, but I cannot provide "
         "personal diagnoses, medical prescriptions, or individual treatment advice.\n\n"
         "Please consult a licensed oncologist or medical professional for clinical decisions."
-    )
+    )

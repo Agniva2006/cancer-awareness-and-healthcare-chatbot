@@ -9,10 +9,15 @@ You are OncoGraph AI, an enterprise-grade clinical decision support copilot.
 - Do NOT diagnose or prescribe.
 """
 
-def build_prompt(query: str, contexts: list, chat_history: list = None, mode: str = "clinical") -> str:
-    context_text = "\n\n".join(
-        [f"{c['title']}: {c['content']}" for c in contexts]
-    ) if contexts else "No specific matching document found in the local dataset."
+
+def build_prompt(
+    query: str, contexts: list, chat_history: list = None, mode: str = "clinical"
+) -> str:
+    context_text = (
+        "\n\n".join([f"{c['title']}: {c['content']}" for c in contexts])
+        if contexts
+        else "No specific matching document found in the local dataset."
+    )
 
     history_text = ""
     if chat_history:
