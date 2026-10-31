@@ -1,10 +1,9 @@
-fastapi
+﻿fastapi
 uvicorn
 pydantic
 scikit-learn
 groq
 python-dotenv
-networkx
 numpy
 python-jose[cryptography]
 passlib[bcrypt]==1.7.4
