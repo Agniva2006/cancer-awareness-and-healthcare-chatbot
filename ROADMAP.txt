@@ -1,0 +1,1158 @@
+================================================================================
+    INDUSTRY-GRADE LUNG CANCER AWARENESS CHATBOT PLATFORM
+              COMPLETE 7-PHASE BUILD ROADMAP (SUPER DETAILED)
+================================================================================
+Project:        Cancer Awareness Chatbot -> Lung Cancer Specialist Platform
+Current State:  Lean RAG chatbot (FastAPI + TF-IDF + Groq + Vanilla JS SPA)
+Target State:   Production SaaS with auth, payments, PostgreSQL, MLOps,
+                and a Deep Learning lung cancer detection microservice
+================================================================================
+
+
+HOW TO USE THIS ROADMAP
+--------------------------------------------------------------------------------
+- Work through the phases IN ORDER. Each phase builds on the previous one.
+- Do NOT skip ahead. A payment system without a real database is a castle on sand.
+- Each phase has: GOAL, PREREQUISITES, DETAILED STEPS, FILES/STRUCTURE, COMMANDS,
+  COMMON MISTAKES, and "DEFINITION OF DONE" (a checklist you must pass before
+  moving to the next phase).
+- Estimated effort assumes ~10-15 hours/week of part-time work.
+
+
+================================================================================
+PHASE 1: DATABASE + INFRASTRUCTURE FOUNDATION
+             (PostgreSQL, Docker Compose, Alembic, pgvector)
+================================================================================
+Estimated: 1-2 weeks | Priority: CRITICAL — everything else depends on this
+
+--------------------------------------------------------------------------------
+1.1 GOAL
+--------------------------------------------------------------------------------
+Replace JSON file storage with a real relational database (PostgreSQL),
+run everything locally with Docker, and set up schema migrations (Alembic)
+so the database evolves safely with the code.
+
+--------------------------------------------------------------------------------
+1.2 WHY POSTGRESQL (THE DECISION)
+--------------------------------------------------------------------------------
+You asked: SQL or NoSQL? ANSWER: PostgreSQL. Here is the reasoning a senior
+engineer would give:
+
+  + ACID transactions — money (orders, subscriptions) MUST be exact. A
+    NoSQL database with eventual consistency can lose a payment record.
+  + Foreign keys & joins — user -> order -> plan -> quota relationships
+    are natural in SQL. In MongoDB you'd model them manually.
+  + JSONB — PostgreSQL's JSONB columns give you document flexibility for
+    chat messages and retrieved context. You do NOT need MongoDB.
+  + pgvector extension — stores AI embeddings for semantic search INSIDE
+    Postgres. You do NOT need a separate vector DB (Qdrant/Pinecone) yet.
+  + One system to learn, backup, and secure.
+
+  What you WILL add later (Phase 5): Redis — as a cache for identical
+  questions and rate-limit counters. That's the NoSQL piece you actually need.
+
+--------------------------------------------------------------------------------
+1.3 DETAILED STEPS
+--------------------------------------------------------------------------------
+
+STEP 1: Install Docker Desktop
+  - Windows: download Docker Desktop, enable WSL2 backend.
+  - Verify: `docker --version` and `docker compose version`.
+
+STEP 2: Create docker-compose.yml at project root with these services:
+  - db (postgres:16-alpine)
+      * port 5432
+      * env vars: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+      * volume: pgdata:/var/lib/postgresql/data  (data survives restarts)
+      * healthcheck: pg_isready
+  - api (build from Dockerfile)
+      * port 8000
+      * depends_on: db (condition: service_healthy)
+      * env vars: DATABASE_URL, GROQ_API_KEY
+  - redis (redis:7-alpine)  [add now, use in Phase 5]
+      * port 6379
+  - Volume: pgdata named volume
+
+STEP 3: Create .env.docker (never commit) with:
+  - DATABASE_URL=postgresql://postgres:PASSWORD@db:5432/cancer_chatbot
+  - GROQ_API_KEY=your_key
+
+STEP 4: Install Python dependencies for DB work:
+  - sqlalchemy (ORM - the standard Python database toolkit)
+  - alembic (schema migrations - "git for your database")
+  - psycopg2-binary or psycopg[binary] (Postgres driver)
+  - asyncpg (if you use async SQLAlchemy — recommended for FastAPI)
+
+STEP 5: Set up the database layer:
+  - app/core/database.py
+      * Engine + SessionLocal + Base (sync) or async engine (async)
+      * get_db() dependency that yields a session and closes it
+  - app/models/  (SQLAlchemy models — one file per domain)
+      * user.py         (users table)
+      * conversation.py (conversations, messages)
+      * knowledge.py    (knowledge_documents with pgvector column)
+      * billing.py      (orders, subscriptions, usage_events)
+      * audit.py        (audit_log append-only)
+
+STEP 6: Initialize Alembic:
+  - `alembic init app/migrations`
+  - Configure alembic.ini to read DATABASE_URL from env
+  - Configure env.py to import your SQLAlchemy models' metadata
+  - `alembic revision --autogenerate -m "create initial schema"`
+  - `alembic upgrade head`
+  - RULE: NEVER edit an applied migration. Always create a new one.
+
+STEP 7: Enable pgvector:
+  - Use image: pgvector/pgvector:pg16 (has extension preinstalled)
+  - In migration: run `CREATE EXTENSION IF NOT EXISTS vector;`
+  - knowledge_documents table gets: embedding vector(384)
+
+STEP 8: Migrate the JSON knowledge base into the database:
+  - Write scripts/seed_knowledge.py
+      * Read data/cancer_data.json and clinical_oncology_kb.json
+      * Insert into knowledge_documents with category, source
+      * Idempotent: skip if title already exists
+
+STEP 9: Update the RAG service to read from the DB instead of JSON files.
+
+--------------------------------------------------------------------------------
+1.4 TARGET DATABASE SCHEMA (DESIGN ALL TABLES NOW)
+--------------------------------------------------------------------------------
+
+  users
+    id              UUID PK
+    email           VARCHAR(255) UNIQUE NOT NULL
+    password_hash   VARCHAR(255) NOT NULL
+    full_name       VARCHAR(255)
+    role            VARCHAR(20) DEFAULT 'patient'  -- patient|professional|admin
+    is_active       BOOLEAN DEFAULT TRUE
+    is_verified     BOOLEAN DEFAULT FALSE
+    created_at      TIMESTAMPTZ
+    updated_at      TIMESTAMPTZ
+
+  sessions  (refresh tokens)
+    id              UUID PK
+    user_id         UUID FK -> users
+    token_hash      VARCHAR(255) NOT NULL   (hash the token, not the token)
+    expires_at      TIMESTAMPTZ
+    created_at      TIMESTAMPTZ
+    revoked_at      TIMESTAMPTZ NULL
+
+  conversations
+    id              UUID PK
+    user_id         UUID FK -> users
+    title           VARCHAR(255)
+    created_at      TIMESTAMPTZ
+    updated_at      TIMESTAMPTZ
+
+  messages
+    id              UUID PK
+    conversation_id UUID FK -> conversations
+    role            VARCHAR(10)   -- user|assistant|system
+    content         TEXT
+    retrieved_context JSONB      (chunk titles + scores the LLM used)
+    triage_level    VARCHAR(10)
+    model_used      VARCHAR(100)
+    created_at      TIMESTAMPTZ
+
+  knowledge_documents
+    id              UUID PK
+    title           VARCHAR(500)
+    content         TEXT
+    source          VARCHAR(255)
+    category        VARCHAR(100)  -- screening|staging|treatment|biomarker|...
+    cancer_type     VARCHAR(100) DEFAULT 'lung'
+    embedding       vector(384)   (pgvector)
+    is_active       BOOLEAN DEFAULT TRUE
+    created_at      TIMESTAMPTZ
+    updated_at      TIMESTAMPTZ
+
+  plans
+    id              UUID PK
+    code            VARCHAR(50) UNIQUE  -- free|pro|clinic
+    name            VARCHAR(100)
+    monthly_quota   INTEGER
+    price_cents     INTEGER
+    features        JSONB
+    is_active       BOOLEAN
+
+  subscriptions
+    id              UUID PK
+    user_id         UUID FK -> users
+    plan_id         UUID FK -> plans
+    status          VARCHAR(20)  -- active|past_due|canceled|trialing
+    provider        VARCHAR(20)  -- stripe|razorpay
+    provider_customer_id  VARCHAR(255)
+    provider_subscription_id VARCHAR(255)
+    current_period_start  TIMESTAMPTZ
+    current_period_end    TIMESTAMPTZ
+    cancel_at_period_end  BOOLEAN DEFAULT FALSE
+    created_at      TIMESTAMPTZ
+
+  orders
+    id              UUID PK
+    user_id         UUID FK -> users
+    plan_id         UUID FK -> plans
+    amount          INTEGER  (in cents — never floats for money!)
+    currency        VARCHAR(3)
+    provider        VARCHAR(20)
+    provider_payment_id   VARCHAR(255)
+    status          VARCHAR(20)  -- pending|paid|failed|refunded
+    created_at      TIMESTAMPTZ
+
+  usage_events
+    id              UUID PK
+    user_id         UUID FK -> users
+    endpoint        VARCHAR(100)
+    tokens_used     INTEGER
+    cost_cents      INTEGER
+    created_at      TIMESTAMPTZ
+
+  audit_log  (append-only, never UPDATE/DELETE)
+    id              UUID PK
+    user_id         UUID NULL
+    action          VARCHAR(100)
+    details         JSONB
+    ip_address      VARCHAR(45)
+    created_at      TIMESTAMPTZ
+
+  INDEXES to create:
+    - users(email) — already unique
+    - messages(conversation_id, created_at)
+    - knowledge_documents(embedding) — pgvector ivfflat/hnsw index
+    - usage_events(user_id, created_at)
+    - subscriptions(user_id, status)
+
+--------------------------------------------------------------------------------
+1.5 PROJECT STRUCTURE AFTER PHASE 1
+--------------------------------------------------------------------------------
+
+  app/
+    ├── main.py
+    ├── api/v1/endpoints/     (health.py, chat.py)
+    ├── core/                 (config.py, database.py NEW, logging_config.py)
+    ├── models/               NEW (user.py, conversation.py, knowledge.py,
+    │                                   billing.py, audit.py)
+    ├── migrations/           NEW (alembic)
+    ├── schemas/              (chat.py)
+    ├── services/             (rag.py, model.py, prompts.py, safety.py, triage.py)
+    └── utils/
+  docker-compose.yml          NEW
+  scripts/seed_knowledge.py   NEW
+
+--------------------------------------------------------------------------------
+1.6 COMMANDS CHEAT SHEET
+--------------------------------------------------------------------------------
+  docker compose up -d              # start db + redis + api
+  docker compose logs -f db         # watch database logs
+  alembic revision --autogenerate -m "..."   # create migration
+  alembic upgrade head              # apply migrations
+  alembic downgrade -1              # rollback last migration
+  psql -h localhost -U postgres -d cancer_chatbot   # interactive SQL
+
+--------------------------------------------------------------------------------
+1.7 COMMON MISTAKES (AVOID)
+--------------------------------------------------------------------------------
+  x Editing an already-applied migration file
+  x Storing money as float (always integer cents)
+  x Forgetting a created_at/updated_at on every table
+  x No index on foreign keys used in queries
+  x Committing .env with real passwords
+  x Using the sync driver with async FastAPI endpoints (pick one, be consistent)
+
+--------------------------------------------------------------------------------
+1.8 DEFINITION OF DONE (CHECKLIST)
+--------------------------------------------------------------------------------
+  [ ] docker compose up starts db + api + redis and all are healthy
+  [ ] alembic upgrade head runs cleanly from an empty database
+  [ ] JSON knowledge data seeded into knowledge_documents (verified via psql)
+  [ ] Existing /ask endpoint still works (reads knowledge from DB now)
+  [ ] pytest suite still passes (update fixtures to use test DB)
+  [ ] pgdata volume persists after docker compose down && up
+
+
+================================================================================
+PHASE 2: AUTHENTICATION & USER SYSTEM
+             (Register / Login / JWT / RBAC / Rate Limiting)
+================================================================================
+Estimated: 1-2 weeks | Priority: CRITICAL
+
+--------------------------------------------------------------------------------
+2.1 GOAL
+--------------------------------------------------------------------------------
+A complete, production-grade login/signup system with proper token lifecycle,
+role-based access control, and brute-force protection — actually WIRED into
+the API (your previous auth module was dead code; this time it gets used).
+
+--------------------------------------------------------------------------------
+2.2 THE FLOW YOU MUST UNDERSTAND (MEMORIZE THIS)
+--------------------------------------------------------------------------------
+
+  REGISTRATION:
+    client -> POST /auth/register {email, password, full_name}
+           -> validate (email format, password policy)
+           -> check email not already taken
+           -> hash password with bcrypt (NEVER plaintext, NEVER MD5/SHA)
+           -> insert user (is_active=True, is_verified=False)
+           -> send verification email (token valid 24h)
+           -> return 201
+
+  LOGIN:
+    client -> POST /auth/login {email, password}
+           -> look up user by email
+           -> bcrypt.checkpw(input, stored_hash)   (constant-time compare)
+           -> issue TWO tokens:
+                ACCESS TOKEN  (JWT, 15 min expiry, stateless)
+                REFRESH TOKEN (opaque random string, 7-30 days, stored hashed
+                               in sessions table, stateful)
+           -> return both
+
+  EVERY PROTECTED REQUEST:
+    client -> GET /ask with "Authorization: Bearer <access_token>"
+           -> verify JWT signature + expiry
+           -> load user from DB (check is_active)
+           -> process request
+
+  ACCESS TOKEN EXPIRED:
+    client -> POST /auth/refresh {refresh_token}
+           -> look up token hash in sessions table
+           -> check not expired, not revoked
+           -> ROTATE: revoke old row, create new session row
+           -> issue new access + refresh tokens
+
+  LOGOUT:
+    client -> POST /auth/logout with refresh token
+           -> set revoked_at on that session row
+           -> client deletes tokens from storage
+
+  WHY TWO TOKENS? (this is the key interview question)
+    - Access token leaks? It dies in 15 minutes. Damage limited.
+    - Refresh token leak? Server can revoke it (it's in the DB).
+    - Stateless JWT access tokens mean no DB hit on every request — fast.
+    - Stateful refresh tokens mean revocable sessions — secure.
+
+--------------------------------------------------------------------------------
+2.3 DETAILED STEPS
+--------------------------------------------------------------------------------
+
+STEP 1: Install: python-jose[cryptography], passlib[bcrypt], bcrypt==4.0.1
+        (pin bcrypt — passlib has compatibility issues with bcrypt>=4.1)
+
+STEP 2: Password policy (app/core/security.py):
+        - Minimum 10 characters
+        - At least one uppercase, one lowercase, one digit
+        - Optional: check against haveibeenpwned's Pwned Passwords API (free)
+
+STEP 3: Token creation/verification (app/core/security.py):
+        - create_access_token(user_id, role, expires_minutes=15)
+        - create_refresh_token() -> random 64-char secret, store SHA-256 hash
+        - decode_token() raising specific exceptions for expired/invalid
+
+STEP 4: Endpoints (app/api/v1/endpoints/auth.py):
+        POST /auth/register
+        POST /auth/login          (rate limited: 5 per 15 min per IP)
+        POST /auth/refresh
+        POST /auth/logout
+        POST /auth/verify-email?token=...
+        POST /auth/forgot-password  (always return 200 — don't leak which
+                                     emails exist)
+        POST /auth/reset-password?token=...
+        GET  /auth/me  (return current user profile)
+
+STEP 5: Dependencies (app/core/deps.py):
+        get_current_user  — hard requirement (401 if missing)
+        get_optional_user — used by /ask so guest usage is possible if you want
+        require_role("admin") — for admin-only endpoints
+
+STEP 6: Email service (app/services/email.py):
+        - Provider options (free tiers): Brevo, Resend, SendGrid
+        - Abstract behind a class so you can swap providers
+        - Templates: verify email, reset password, welcome
+        - In DEV mode: log emails to console instead of sending
+
+STEP 7: Rate limiting:
+        - Simple in-memory dict per IP (dev) -> Redis counters (prod)
+        - Apply to /auth/login and /auth/register
+
+STEP 8: RBAC roles:
+        patient      -> chat only
+        professional -> chat + clinical mode
+        admin        -> KB management, user list, metrics
+
+STEP 9: Audit logging: record login, failed login, password change to audit_log.
+
+STEP 10: FRONTEND changes:
+        - Login/register modal (you deleted the old one; rebuild properly)
+        - Store access token in memory (NOT localStorage — XSS risk)
+        - Store refresh token in httpOnly cookie (needs backend cookie support)
+          OR localStorage with the understanding of XSS tradeoff
+        - Auto-refresh logic: if any request gets 401, try refresh, retry once
+        - Logout button clears tokens
+
+--------------------------------------------------------------------------------
+2.4 SECURITY CHECKLIST (OWASP)
+--------------------------------------------------------------------------------
+  [ ] Passwords hashed with bcrypt (cost >= 12)
+  [ ] Timing-safe comparison (passlib handles this)
+  [ ] No user enumeration (login errors are identical for wrong email/password)
+  [ ] JWT signed with a strong secret (>= 32 chars) from env
+  [ ] Refresh tokens stored HASHED
+  [ ] Token rotation on refresh
+  [ ] Rate limiting on auth endpoints
+  [ ] CORS restricted to your frontend origins
+  [ ] Security headers (X-Content-Type-Options, X-Frame-Options)
+  [ ] HTTPS enforced in production (Render/Railway do this automatically)
+  [ ] SQL injection safe (SQLAlchemy ORM parameterizes — never f-strings in SQL)
+  [ ] Input validation everywhere (Pydantic)
+
+--------------------------------------------------------------------------------
+2.5 DEFINITION OF DONE
+--------------------------------------------------------------------------------
+  [ ] Can register, verify email, login, refresh, logout — full cycle
+  [ ] Access token expires after 15 min and refresh flow recovers silently
+  [ ] 6th login attempt from same IP in 15 min gets 429
+  [ ] /ask rejects unauthenticated requests with 401
+  [ ] admin-only endpoints return 403 for patient role
+  [ ] Audit log records login events
+  [ ] pytest tests for: register, login, refresh, logout, role gating
+
+
+================================================================================
+PHASE 3: PAYMENT SYSTEM
+             (Stripe/Razorpay, Plans, Webhooks, Quotas)
+================================================================================
+Estimated: 1-2 weeks | Priority: HIGH
+
+--------------------------------------------------------------------------------
+3.1 GOAL
+--------------------------------------------------------------------------------
+Freemium monetization: Free tier with monthly quota, paid tiers with more
+features. Payments handled 100% by the provider; your server only reacts to
+webhooks. Quota enforcement is server-side.
+
+--------------------------------------------------------------------------------
+3.2 THE THREE GOLDEN RULES
+--------------------------------------------------------------------------------
+  1. NEVER store card numbers — the provider (Stripe/Razorpay) handles them
+     on their hosted page. You never see them. PCI compliance is theirs.
+  2. NEVER trust the frontend for pricing — the server defines plan prices
+     from config; the frontend just shows buttons.
+  3. WEBHOOKS ARE THE SOURCE OF TRUTH — activate a subscription ONLY when the
+     provider's webhook arrives (with a verified signature), never from a
+     frontend redirect (which can be faked).
+
+--------------------------------------------------------------------------------
+3.3 PROVIDER CHOICE
+--------------------------------------------------------------------------------
+  Stripe        -> best docs, global, excellent test mode, use this if your
+                   audience is international
+  Razorpay      -> best for India (UPI, RuPay, local cards)
+  Paddle/LemonSqueezy -> "merchant of record" — they handle global tax/VAT
+                         for you (worth it if selling worldwide and you don't
+                         want to deal with tax compliance)
+
+--------------------------------------------------------------------------------
+3.4 THE PAYMENT FLOW (STRIPE EXAMPLE)
+--------------------------------------------------------------------------------
+
+  1. User clicks "Upgrade to Pro" on your pricing page
+  2. Frontend -> POST /billing/checkout {plan_code: "pro"}
+  3. Server:
+       - Verifies user is authenticated
+       - Gets/creates Stripe Customer for this user (store customer_id)
+       - Creates a Checkout Session with:
+           * price ID for the "pro" plan (from env/DB)
+           * success_url, cancel_url
+           * metadata: {user_id, plan_code}
+       - Returns session URL
+  4. Frontend redirects user to that URL (Stripe-hosted payment page)
+  5. User pays
+  6. STRIPE SENDS WEBHOOK to your server: POST /billing/webhooks/stripe
+  7. Server:
+       - VERIFIES SIGNATURE (critical! prevents forged requests)
+       - Checks event hasn't been processed before (idempotency — Stripe can
+         send the same event twice)
+       - Updates subscriptions table: status=active, period dates
+       - Records the order as paid
+       - Grants entitlements (quota reset, features unlock)
+  8. Frontend success page -> polls /auth/me which now shows plan "pro"
+
+  WEBHOOK EVENTS TO HANDLE:
+    checkout.session.completed        -> subscription created
+    customer.subscription.updated     -> plan change, renewal, cancel_at_end
+    customer.subscription.deleted     -> subscription ended
+    invoice.payment_failed            -> dunning: mark past_due, notify user
+    invoice.paid                      -> renewal confirmed
+
+--------------------------------------------------------------------------------
+3.5 PLANS TO IMPLEMENT
+--------------------------------------------------------------------------------
+  ┌──────────┬──────────────┬─────────────────────────────────────┐
+  │ Plan     │ Price        │ Features                            │
+  ├──────────┼──────────────┼─────────────────────────────────────┤
+  │ Free     │ $0           │ 20 queries/month, patient mode only │
+  │ Pro      │ $9/month     │ Unlimited queries, clinical mode,   │
+  │          │              │ priority latency, chat export       │
+  │ Clinic   │ $49/month    │ Everything in Pro + team seats (5), │
+  │          │              │ admin dashboard, usage analytics    │
+  └──────────┴──────────────┴─────────────────────────────────────┘
+
+  Implement annual pricing later (2 months free) — adds complexity, do monthly
+  first.
+
+--------------------------------------------------------------------------------
+3.6 QUOTA ENFORCEMENT (SERVER-SIDE, ALWAYS)
+--------------------------------------------------------------------------------
+  - On every /ask call:
+      1. Count usage_events for user in current billing period
+      2. If count >= plan quota -> return 429 with a friendly message
+         and the upgrade link
+      3. Otherwise, log a usage_event AFTER answering (only count successes)
+  - Billing period = from current_period_start to current_period_end
+  - Show remaining quota in the frontend sidebar (you had this UI before)
+
+--------------------------------------------------------------------------------
+3.7 DETAILED STEPS
+--------------------------------------------------------------------------------
+STEP 1: Create Stripe account, get TEST keys (sk_test_..., pk_test_...)
+STEP 2: Create products + prices in Stripe dashboard (Pro monthly $9, Clinic
+        monthly $49). Copy the price IDs (price_...) into env vars.
+STEP 3: Install: stripe (Python SDK)
+STEP 4: app/services/billing.py:
+        - create_checkout_session(user, plan_code) -> URL
+        - handle_webhook(payload, signature) -> process event
+STEP 5: Endpoints (app/api/v1/endpoints/billing.py):
+        POST /billing/checkout
+        POST /billing/webhooks/stripe     (NO AUTH — signature verifies it)
+        GET  /billing/subscription        (current plan + usage)
+        POST /billing/portal              (Stripe customer portal — lets users
+                                           manage cards/cancel without you
+                                           building that UI)
+STEP 6: Webhook endpoint config:
+        - Run locally: stripe listen --forward-to localhost:8000/billing/webhooks/stripe
+        - In production: add webhook endpoint in Stripe dashboard
+STEP 7: Quota service (app/services/quota.py): check_and_count(user)
+STEP 8: Frontend: pricing page, upgrade buttons, "you've used X/Y" bar
+STEP 9: Test with Stripe test card 4242 4242 4242 4242 (always succeeds),
+        4000 0000 0000 9995 (always fails), and trigger webhook events manually
+
+--------------------------------------------------------------------------------
+3.8 COMMON MISTAKES (AVOID)
+--------------------------------------------------------------------------------
+  x Activating subscription from the frontend success redirect (forgeable)
+  x Not verifying webhook signature
+  x Not handling duplicate webhook deliveries (idempotency key = event.id)
+  x Storing amounts as float (use integer cents)
+  x Not handling failed payments (user should be downgraded or notified)
+  x Forgetting to cancel on provider side when user "downgrades" in your UI
+
+--------------------------------------------------------------------------------
+3.9 DEFINITION OF DONE
+--------------------------------------------------------------------------------
+  [ ] Free user hits 20-query quota -> gets 429 with upgrade message
+  [ ] Complete test-mode purchase activates the subscription via webhook
+  [ ] Duplicate webhook delivery is handled (no double activation)
+  [ ] Cancel from Stripe portal -> subscription.status becomes canceled
+  [ ] Failed payment -> user marked past_due and email sent
+  [ ] /auth/me returns current plan + usage count
+  [ ] pytest tests with mocked Stripe webhooks
+
+
+================================================================================
+PHASE 4: LUNG CANCER KNOWLEDGE BASE + HYBRID RAG
+             (From Generic to Deep Clinical Specialization)
+================================================================================
+Estimated: 2-3 weeks | Priority: HIGH — this is the product's core value
+
+--------------------------------------------------------------------------------
+4.1 GOAL
+--------------------------------------------------------------------------------
+Transform the generic cancer chatbot into a LUNG CANCER SPECIALIST with
+clinical-grade knowledge, semantic retrieval (pgvector embeddings), and
+hybrid search. This is where the chatbot stops being a demo and becomes
+genuinely useful.
+
+--------------------------------------------------------------------------------
+4.2 KNOWLEDGE BASE — WRITE THE CORPUS FIRST
+--------------------------------------------------------------------------------
+Structure every article with: title, content, category, cancer_type='lung',
+source (citation), difficulty (patient|professional).
+
+Categories to cover (target: 80-150 articles):
+
+  A. TYPES & PATHOLOGY
+     - NSCLC overview (85% of lung cancers)
+     - Adenocarcinoma, squamous cell carcinoma, large cell carcinoma
+     - SCLC overview (15%, aggressive, staging: limited/extensive)
+     - Mesothelioma (brief, distinction)
+     - Metastatic lung disease vs primary lung tumor
+
+  B. SCREENING & EARLY DETECTION
+     - Who should get screened (USPSTF criteria: age 50-80, 20 pack-years,
+       current smoker or quit within 15 years)
+     - Low-dose CT vs chest X-ray (LDCT is the only proven screening)
+     - What happens after a suspicious nodule (Fleischner Society guidelines)
+     - Lung nodule types: ground-glass, solid, part-solid
+
+  C. DIAGNOSIS PATHWAY
+     - Symptoms: persistent cough >3 weeks, hemoptysis, chest pain, dyspnea,
+       hoarseness, unexplained weight loss, bone pain
+     - Imaging: chest X-ray -> CT -> PET-CT (what each shows)
+     - Tissue sampling: bronchoscopy, EBUS-TBNA, CT-guided biopsy,
+       thoracoscopy/VATS — what to expect, risks
+     - Molecular testing (NGS): what genes get tested and why
+     - PD-L1 testing
+
+  D. STAGING (TNM 8th edition)
+     - What T, N, M mean in plain language
+     - Stage I-IV explained simply
+     - SCLC: limited vs extensive stage
+
+  E. BIOMARKERS & TARGETED THERAPY (deep, this is the specialty)
+     - EGFR mutations (exon 19 del, L858R, T790M) -> osimertinib
+     - ALK rearrangements -> alectinib, lorlatinib
+     - ROS1 -> crizotinib, entrectinib
+     - KRAS G12C -> sotorasib, adagrasib
+     - MET exon 14 skipping -> capmatinib, tepotinib
+     - RET fusions -> selpercatinib
+     - BRAF V600E -> dabrafenib + trametinib
+     - NRG1 fusions, HER2 mutations
+     - Resistance mechanisms: what happens when treatment stops working
+
+  F. IMMUNOTHERAPY
+     - How checkpoint inhibitors work (PD-1/PD-L1) — in plain language
+     - Pembrolizumab, atezolizumab, nivolumab, durvalumab
+     - Chemo-immunotherapy combinations
+     - Durvalumab consolidation after chemoradiation (stage III)
+
+  G. TREATMENT MODALITIES
+     - Surgery: lobectomy, segmentectomy, wedge resection, VATS vs open
+     - Radiation: SBRT (stereotactic), conventional, chemoradiation
+     - Chemotherapy: platinum doublets, what cycles mean
+     - Antibody-drug conjugates: trastuzumab deruxtecan, datopotamab
+     - Clinical trials: how to find them, why they matter, phases explained
+
+  H. SIDE EFFECTS & SUPPORTIVE CARE
+     - Immunotherapy irAEs: colitis, pneumonitis, thyroiditis, hepatitis
+     - Febrile neutropenia — EMERGENCY (RED triage)
+     - Chemotherapy: nausea, fatigue, neuropathy, hair loss
+     - Targeted therapy: rash, diarrhea, interstitial lung disease
+     - Radiation esophagitis
+
+  I. PARANEOPLASTIC SYNDROMES
+     - SVC syndrome — EMERGENCY
+     - Lambert-Eaton, SIADH, hypercalcemia
+
+  J. SUPPORTIVE & LIFESTYLE
+     - Smoking cessation resources
+     - Nutrition during treatment
+     - Palliative care vs hospice (myth-busting)
+     - Caregiver guidance
+     - Mental health and support groups
+     - Returning to work
+
+SOURCES TO CITE: WHO, NCCN Patient Guidelines (free), American Cancer Society,
+National Cancer Institute (PDQ summaries), NICE guidelines, Lung Cancer
+Europe, GO2 for Lung Cancer. Every article must have a source field.
+
+--------------------------------------------------------------------------------
+4.3 RETRIEVAL UPGRADE: TF-IDF -> HYBRID SEMANTIC SEARCH
+--------------------------------------------------------------------------------
+Current: TF-IDF (keyword matching). Misses synonyms ("my scan came back" won't
+match "imaging results").
+
+Upgrade to HYBRID:
+  1. Dense/semantic: embed each article with SentenceTransformers
+     all-MiniLM-L6-v2 (free, runs locally, 384 dims — matches your schema)
+     - Store embeddings in knowledge_documents.embedding (pgvector)
+     - Query: embed the question, cosine similarity search
+  2. Sparse/keyword: TF-IDF or BM25 (keep what you have)
+  3. FUSION: Reciprocal Rank Fusion (RRF)
+     score = sum(1 / (60 + rank_i)) for each list
+     - Gives the best of both worlds: semantic understanding + exact medical
+       term matching ("EGFR exon 19 deletion" needs exact match)
+
+  CHUNKING: articles longer than ~300 tokens -> split into overlapping chunks
+  (keep the title with each chunk). Store chunk-level embeddings.
+
+  EMBEDDING RECOMPUTE: whenever you add/update a knowledge article, recompute
+  its embedding (do it in the seed script or on save).
+
+--------------------------------------------------------------------------------
+4.4 CHATBOT UPGRADES
+--------------------------------------------------------------------------------
+  a. SYSTEM PROMPT (lung cancer specialist):
+     "You are OncoLung, a lung cancer information assistant for patients and
+     clinicians. You answer ONLY from the provided context. If the context is
+     insufficient, say so honestly. Never diagnose, never prescribe, never
+     give personal treatment advice. Cite the source titles you used. Match
+     the tone to the audience mode."
+
+  b. CONVERSATION MEMORY:
+     - Store last 6 turns in the messages table
+     - Pass to LLM as context (you already pass chat_history — now persist it)
+     - Add follow-up understanding: "What about stage 3?" after a stage
+       question should resolve "stage 3" to the same topic.
+
+  c. CLARIFICATION BEHAVIOR:
+     Instruct the model: if the question is ambiguous (e.g., "my scan"), ask
+     ONE clarifying question before answering.
+
+  d. GROUNDING CHECK:
+     - If top retrieval score < threshold -> answer "I don't have enough
+       verified information about this. Please consult a qualified
+       oncologist." Do NOT let the LLM freestyle on medical topics.
+
+  e. CITE SOURCES:
+     - Return the article titles used (you already do this — render them in
+       the frontend as clickable chips)
+
+  f. STREAMING (optional, big UX win):
+     - Server-Sent Events (SSE) from FastAPI: stream tokens as the LLM
+       generates them
+     - Frontend: render progressively with a typing cursor
+     - Implement after the core is solid
+
+--------------------------------------------------------------------------------
+4.5 DEFINITION OF DONE
+--------------------------------------------------------------------------------
+  [ ] 80+ lung-cancer articles seeded with sources and categories
+  [ ] pgvector embeddings computed for all articles
+  [ ] "EGFR exon 19 deletion targeted therapy" retrieves the right article
+  [ ] "What does my scan mean?" (ambiguous) triggers a clarifying question
+  [ ] Query about "fever after chemo" triggers RED triage banner
+  [ ] Answers cite sources; frontend shows them
+  [ ] Unrelated queries return the honest "insufficient info" response
+  [ ] Retrieval latency < 100ms for hybrid search
+
+
+================================================================================
+PHASE 5: MLOPS, DEPLOYMENT & OBSERVABILITY
+             (CI/CD, Containers, Monitoring, Backups)
+================================================================================
+Estimated: 1-2 weeks | Priority: HIGH — without this, the product is not real
+
+--------------------------------------------------------------------------------
+5.1 GOAL
+--------------------------------------------------------------------------------
+Production-grade deployment: automated tests on every push, containerized
+deploys, error tracking, metrics, and database backups. This is what separates
+a demo from a product.
+
+--------------------------------------------------------------------------------
+5.2 ENVIRONMENT PROMOTION
+--------------------------------------------------------------------------------
+  local dev -> staging -> production
+
+  | Env        | Where             | Database          | Payment keys |
+  |------------|-------------------|-------------------|--------------|
+  | local      | docker compose    | local postgres    | Stripe test  |
+  | staging    | Render free tier  | Render free PG    | Stripe test  |
+  | production | Render/Railway/Fly| Render paid PG    | Stripe LIVE  |
+
+  Each environment has its own .env. Never share secrets between environments.
+
+--------------------------------------------------------------------------------
+5.3 CI/CD WITH GITHUB ACTIONS
+--------------------------------------------------------------------------------
+  .github/workflows/ci.yml:
+    on: push, pull_request
+    jobs:
+      lint:    pip install flake8; flake8 app tests
+      test:    pip install -r requirements.txt; pytest
+             (use a postgres service container for DB tests)
+      build:   docker build . (verify image builds)
+
+  .github/workflows/deploy.yml:
+    on: push to main
+    jobs:
+      deploy-staging: build & push image, run alembic upgrade, restart service
+
+  RULE: main branch is always deployable. Feature branches for everything.
+
+--------------------------------------------------------------------------------
+5.4 DOCKER IMPROVEMENTS
+--------------------------------------------------------------------------------
+  Multi-stage Dockerfile:
+    Stage 1 (builder): install deps into a venv
+    Stage 2 (runtime): copy only the venv + code
+    -> smaller image, fewer attack surfaces, faster deploys
+
+  .dockerignore: .git, .env, __pycache__, .pytest_cache, node_modules,
+                 *.pkl, frontend/ (if frontend is deployed separately)
+
+  Non-root user in the container (security best practice).
+
+--------------------------------------------------------------------------------
+5.5 OBSERVABILITY
+--------------------------------------------------------------------------------
+  a. Structured JSON logging (you have logging_config.py — extend it to JSON
+     output in production, human-readable in dev)
+
+  b. Sentry (free tier, sentry.io):
+     - pip install sentry-sdk[fastapi]
+     - Captures exceptions with full stack traces, user context, request IDs
+     - Set DSN via env var
+
+  c. Metrics to track (Grafana/Render dashboard later):
+     - Request rate, error rate, latency p50/p95/p99
+     - LLM token spend per day (you log usage_events — aggregate them)
+     - Active subscriptions count
+     - Query success rate (answer quality proxy: did retrieval find context?)
+
+  d. Health checks:
+     - /health (liveness — is the process up?)
+     - /health/ready (readiness — can it reach the DB, Redis, LLM provider?)
+
+  e. Uptime monitoring: UptimeRobot (free) or Render's built-in
+
+--------------------------------------------------------------------------------
+5.6 DATABASE BACKUPS
+--------------------------------------------------------------------------------
+  - Render paid Postgres: automated daily backups + point-in-time recovery
+  - Self-managed: nightly pg_dump cron to S3
+  - TEST YOUR RESTORE — a backup you've never restored is not a backup.
+
+--------------------------------------------------------------------------------
+5.7 DEPLOYMENT TARGETS (PICK ONE)
+--------------------------------------------------------------------------------
+  Render      -> simplest, you already have render.yaml, free tier available
+  Railway     -> good DX, per-usage pricing
+  Fly.io      -> more control, good latency globally
+  AWS/GCP     -> most control, most complexity (only if you need it)
+
+  Recommended: stay on Render for now. Migrate later if you outgrow it.
+
+--------------------------------------------------------------------------------
+5.8 DEFINITION OF DONE
+--------------------------------------------------------------------------------
+  [ ] Push to a feature branch triggers lint+test in GitHub Actions
+  [ ] Merge to main auto-deploys to staging
+  [ ] Docker image builds in under 5 minutes
+  [ ] Sentry captures a test exception
+  [ ] /health/ready checks DB + Redis + LLM reachability
+  [ ] Database backups configured AND restore tested
+  [ ] Secrets in prod come from platform env vars, never from the repo
+
+
+================================================================================
+PHASE 6: LUNG CANCER DETECTION WITH DEEP LEARNING
+             (Chest CT -> Nodule Detection & Classification Microservice)
+================================================================================
+Estimated: 4-6 weeks | Priority: ADVANCED — only after Phases 1-5 are solid
+
+--------------------------------------------------------------------------------
+6.1 GOAL
+--------------------------------------------------------------------------------
+A separate microservice that takes a chest CT scan (or a slice/series) and:
+  1. Detects lung nodules (object detection)
+  2. Classifies malignancy risk (binary: benign vs suspicious)
+  3. Returns results to the main chatbot, which explains them in plain language
+     with heavy disclaimers.
+
+  THIS IS A RESEARCH/EDUCATIONAL TOOL. It is NOT a diagnostic device. Every
+  result must carry: "This is experimental and not a medical diagnosis."
+
+--------------------------------------------------------------------------------
+6.2 WHY A SEPARATE MICROSERVICE
+--------------------------------------------------------------------------------
+  - Different runtime: needs GPU, PyTorch, huge model weights — don't slow
+    down your API container
+  - Different scaling: inference load != chat load
+  - Different deploy cycle: you'll retrain models often
+  - Communicates with the main API via REST (upload scan -> get JSON result)
+
+--------------------------------------------------------------------------------
+6.3 DATASETS (START HERE)
+--------------------------------------------------------------------------------
+  LIDC-IDRI (Lung Imaging Database Consortium)
+    - ~1,000 chest CT scans with radiologist-annotated lung nodules
+    - The gold standard for lung nodule research
+    - Requires free registration (TCIA - The Cancer Imaging Archive)
+    - ~120 GB (you can download subsets)
+
+  LUNA16
+    - Cleaned subset of LIDC-IDRI (removed inconsistencies)
+    - 1,186 scans, ~7,000 annotated nodules
+    - Standard benchmark for nodule detection
+    - EASIER TO START WITH than raw LIDC
+
+  NLST (National Lung Screening Trial)
+    - Huge screening dataset, requires application
+    - Better for later, not for getting started
+
+  RECOMMENDED PATH: LUNA16 first.
+
+--------------------------------------------------------------------------------
+6.4 MODEL ARCHITECTURE (RECOMMENDED LEARNING PATH)
+--------------------------------------------------------------------------------
+
+  LEVEL 1 (start here — 2D classification):
+    - Take CT slices containing nodules (crop around annotated nodules)
+    - Fine-tune a pretrained 2D CNN: ResNet-50 or DenseNet-121
+    - Binary classification: nodule vs no nodule (or benign vs suspicious)
+    - Learn the full pipeline: data loading, augmentation, training,
+      validation, inference
+    - Metrics: accuracy, AUC, sensitivity, specificity
+
+  LEVEL 2 (3D — real clinical quality):
+    - 3D CNN (3D ResNet / 3D DenseNet) on nodule crops (e.g., 32x32x32)
+    - Uses volumetric context — significantly better performance
+    - Use PyTorch with 3D convolutions
+
+  LEVEL 3 (full detection — the real product):
+    - Object detection on full CT volumes
+    - Options: RetinaNet-3D, YOLOv5-3D adaptations, or MONAI's detection API
+    - MONAI (Medical Open Network for AI) — PyTorch-based framework
+      purpose-built for medical imaging. USE IT. It handles DICOM parsing,
+      3D transforms, sliding-window inference, and has pretrained models.
+
+  LEVEL 4 (segmentation, advanced):
+    - U-Net variants for tumor boundary delineation
+    - Volumetric growth tracking (RECIST criteria)
+
+--------------------------------------------------------------------------------
+6.5 DATA PIPELINE (THE MOST IMPORTANT PART)
+--------------------------------------------------------------------------------
+  1. DICOM parsing: pydicom to read CT scans (HU values — Hounsfield Units)
+  2. Preprocessing:
+     - Normalize HU (window: lung window, e.g., -1000 to 400 HU)
+     - Resample to consistent voxel spacing (e.g., 1x1x1 mm)
+     - Resize/crop to standard input size
+  3. Data loading: MONAI's Dataset/DataLoader with transforms
+  4. Data augmentation:
+     - Random flips, rotations, intensity shifts
+     - BE CAREFUL: augmentation must respect medical reality (don't flip
+       laterality markers)
+  5. Train/val/test split: SPLIT BY PATIENT, never by slice (otherwise
+     slices from the same scan leak between sets — you'll get fake metrics)
+
+  THIS IS THE #1 BEGINNER MISTAKE: splitting by slice instead of by patient.
+  Your model will look 99% accurate and be useless in reality.
+
+--------------------------------------------------------------------------------
+6.6 TRAINING SETUP
+--------------------------------------------------------------------------------
+  - GPU required: options
+      a) Google Colab free tier (T4 GPU) — start here
+      b) Kaggle Notebooks (free GPU hours)
+      c) Cloud: Lambda Labs / RunPod / Vast.ai (cheap per-hour)
+  - Framework: PyTorch + MONAI
+  - Experiment tracking: Weights & Biases (free tier) or MLflow
+    (log every run: hyperparams, metrics, loss curves — non-negotiable for
+     a real ML project)
+  - Hyperparameters to start:
+      optimizer: AdamW, lr 1e-4, weight decay 1e-5
+      batch size: 16-32 (2D) / 4-8 (3D)
+      epochs: 20-50 with early stopping on validation AUC
+
+--------------------------------------------------------------------------------
+6.7 VALIDATION & METRICS (REPORT THESE HONESTLY)
+--------------------------------------------------------------------------------
+  - Sensitivity (recall): % of true cancers detected — MOST important
+    (a missed cancer is worse than a false alarm)
+  - Specificity: % of true negatives correctly identified
+  - AUC-ROC: overall discriminative ability
+  - Per-nodule FROC analysis (FROC = free-response ROC, standard in this field)
+  - Report on a HELD-OUT test set the model NEVER saw
+
+--------------------------------------------------------------------------------
+6.8 SERVING THE MODEL
+--------------------------------------------------------------------------------
+  - Separate FastAPI service (detection-api/)
+  - Endpoint: POST /detect (multipart file upload of a CT series/zip)
+  - Steps: validate file type -> preprocess -> run inference -> return JSON:
+      {
+        "nodules": [
+          {"location": {...}, "malignancy_probability": 0.87,
+           "size_mm": 8.2, "confidence": 0.91}
+        ],
+        "model_version": "v1.2.0",
+        "disclaimer": "..."
+      }
+  - Model versioning: save with MLflow/W&B, load specific version at startup
+  - Latency: batch inference, consider ONNX export or TorchScript for speed
+  - GPU serving: Colab won't work for production — use RunPod/Replicate/
+    Hugging Face Inference Endpoints for GPU hosting
+
+--------------------------------------------------------------------------------
+6.9 LLM BRIDGE (THE MAGIC MOMENT)
+--------------------------------------------------------------------------------
+  When detection returns results, feed them into the chatbot:
+    "The AI analysis found [N] lung nodule(s). The largest measures [X] mm
+     with a malignancy probability of [Y]%. According to Fleischner Society
+     guidelines, nodules of this size and profile typically require..."
+
+  The chatbot (already grounded in your Phase 4 knowledge base) explains the
+  finding, what follow-up imaging is standard, and which questions to ask the
+  doctor. THIS integration — AI detection + AI explanation — is what makes
+  your product unique.
+
+--------------------------------------------------------------------------------
+6.10 REGULATORY & ETHICAL REALITY CHECK (READ THIS)
+--------------------------------------------------------------------------------
+  - A DL model that outputs "cancer yes/no" on real patient scans IS a medical
+    device under FDA/EU MDR rules. You cannot ship that as a consumer app.
+  - Safe positioning:
+      * "Educational/research demonstration only"
+      * "Not a medical diagnosis — consult a radiologist"
+      * Synthetic or publicly-available (LUNA16) scans only, no real patient
+        PHI without a compliance framework
+  - If you ever want to go clinical: that's FDA 510(k) clearance territory,
+    requires clinical validation studies, quality systems (ISO 13485),
+    and significant capital. Know this exists; don't try to shortcut it.
+
+--------------------------------------------------------------------------------
+6.11 DEFINITION OF DONE
+--------------------------------------------------------------------------------
+  [ ] LUNA16 subset downloaded and preprocessed
+  [ ] 2D classifier trained with AUC > 0.85 on held-out patient-level test set
+  [ ] Experiment tracking shows every run (W&B or MLflow)
+  [ ] Detection microservice serves predictions from a versioned model
+  [ ] Chatbot integration: upload -> detection -> plain-language explanation
+  [ ] Every response carries the research-only disclaimer
+  [ ] Model card documenting: training data, metrics, limitations
+
+
+================================================================================
+PHASE 7: POLISH, LAUNCH & BUSINESS LAYER
+             (Admin Dashboard, Analytics, Legal, Launch)
+================================================================================
+Estimated: 2-3 weeks | Priority: FINAL POLISH
+
+--------------------------------------------------------------------------------
+7.1 GOAL
+--------------------------------------------------------------------------------
+Everything that makes it a real company: admin tooling, analytics, legal
+pages, and a launch plan.
+
+--------------------------------------------------------------------------------
+7.2 ADMIN DASHBOARD (BUILD OR USE A LIBRARY)
+--------------------------------------------------------------------------------
+  - User list + search + deactivate
+  - Subscription management (view, manually grant/revoke)
+  - Knowledge base editor (CRUD on articles, no deploy needed to update)
+  - Metrics: DAU/MAU, queries per day, top questions, triage RED count
+  - Audit log viewer
+  - Options: build with FastAPI + simple Jinja2 templates, or use
+    SQLAdmin (FastAPI admin library) to save time
+
+--------------------------------------------------------------------------------
+7.3 ANALYTICS (PRODUCT INTELLIGENCE)
+--------------------------------------------------------------------------------
+  - Aggregate usage_events -> dashboards
+  - Top questions: what are users actually asking? (drives KB content)
+  - Retrieval miss rate: how often does the RAG find nothing? (drives quality)
+  - Triage RED events: safety monitoring
+  - Churn: who cancels and when?
+  - Tools: simple SQL queries -> Grafana; or PostHog (free tier) for funnels
+
+--------------------------------------------------------------------------------
+7.4 LEGAL PAGES (NON-NEGOTIABLE)
+--------------------------------------------------------------------------------
+  - Terms of Service
+  - Privacy Policy (GDPR/CCPA compliant — data deletion on request,
+    data retention policy)
+  - Medical Disclaimer (prominent, on every answer, in the footer)
+  - Cookie notice
+  - "Not a medical device" positioning everywhere
+  - Consider: Iubenda, Termly (generators) or a lawyer for the real thing
+
+--------------------------------------------------------------------------------
+7.5 LAUNCH CHECKLIST
+--------------------------------------------------------------------------------
+  [ ] Load testing (locust or k6) — know your limits
+  [ ] Rate limiting on ALL public endpoints
+  [ ] Security review: OWASP top 10 checklist passed
+  [ ] LLM prompt-injection testing (can users make the bot ignore safety?)
+  [ ] Backup + restore drill completed
+  [ ] Error budget: Sentry clean for a week on staging
+  [ ] Domain + HTTPS + email sending verified (not in spam folder)
+  [ ] Onboarding email sequence
+  [ ] Documentation site for users (not just developers)
+  [ ] Beta users recruited (10-20 real users, watch them use it)
+
+--------------------------------------------------------------------------------
+7.6 BUSINESS MODEL RECAP
+--------------------------------------------------------------------------------
+  Free  -> 20 queries/mo  -> acquisition funnel
+  Pro   -> $9/mo          -> individual patients & caregivers
+  Clinic-> $49/mo         -> oncology practices, 5 seats, admin dashboard
+  Future: enterprise deals with hospitals (requires compliance work)
+
+================================================================================
+APPENDIX A: FULL LEARNING RESOURCES
+================================================================================
+
+  PostgreSQL:        postgresql.org/docs, use "pgexercises.com" for practice
+  SQLAlchemy 2.0:    docs.sqlalchemy.org (2.0 style — async)
+  Alembic:           alembic.sqlalchemy.org
+  FastAPI:           fastapi.tiangolo.com (best docs in Python)
+  JWT:               jwt.io + OWASP Authentication Cheat Sheet
+  Stripe:            stripe.com/docs (excellent, do their quickstart)
+  Razorpay:          razorpay.com/docs
+  SentenceTransformers: sbert.net
+  pgvector:          github.com/pgvector/pgvector
+  Docker:            docs.docker.com, learn multi-stage builds
+  GitHub Actions:    docs.github.com/actions
+  Sentry:            docs.sentry.io
+  MONAI:             monai.io (medical imaging PyTorch framework)
+  LUNA16:            luna16.grand-challenge.org
+  pydicom:           pydicom.github.io
+  Weights & Biases:  wandb.ai
+  NCCN Guidelines:   nccn.org (patient versions are FREE)
+  USPSTF lung screening: uspreventiveservicestaskforce.org
+
+================================================================================
+APPENDIX B: WEEK-BY-WEEK SUGGESTED SCHEDULE (PART-TIME, ~10-15h/week)
+================================================================================
+
+  Week  1-2:  Phase 1 — Docker Compose + Postgres + Alembic + models
+  Week  3-4:  Phase 2 — Auth system complete + frontend login UI
+  Week  5-6:  Phase 3 — Stripe integration + webhooks + quotas
+  Week  7-9:  Phase 4 — Lung cancer corpus + hybrid RAG + chatbot upgrades
+  Week 10-11: Phase 5 — CI/CD + Sentry + monitoring + backups
+  Week 12-13: Phase 7 — Admin dashboard + legal + analytics
+              LAUNCH BETA
+  Week 14-19: Phase 6 — DL detection (parallel to running product)
+  Week 20+:   Iteration based on user feedback
+
+================================================================================
+APPENDIX C: REPOSITORY FINAL TARGET STRUCTURE
+================================================================================
+
+  cancer-awareness-chatbot/
+  ├── app/
+  │   ├── main.py
+  │   ├── api/v1/
+  │   │   ├── endpoints/     auth.py, chat.py, billing.py, admin.py, detect.py
+  │   │   └── router.py
+  │   ├── core/              config.py, database.py, security.py, deps.py,
+  │   │                      logging_config.py, constants.py
+  │   ├── models/            user.py, billing.py, chat.py, knowledge.py, audit.py
+  │   ├── schemas/           auth.py, chat.py, billing.py, knowledge.py
+  │   ├── services/          rag.py, model.py, prompts.py, safety.py, triage.py,
+  │   │                      email.py, billing.py, quota.py, embeddings.py
+  │   ├── migrations/        alembic/
+  │   └── utils/
+  ├── detection/             (separate microservice, Phase 6)
+  │   ├── api/
+  │   ├── models/
+  │   ├── training/
+  │   └── data/
+  ├── frontend/              SPA (React migration optional)
+  ├── tests/
+  ├── scripts/               seed_knowledge.py, create_admin.py, backup.sh
+  ├── .github/workflows/     ci.yml, deploy.yml
+  ├── docker-compose.yml
+  ├── Dockerfile
+  ├── alembic.ini
+  ├── pytest.ini, setup.cfg
+  ├── requirements.txt
+  ├── .env.example
+  └── README.md
+
+================================================================================
+                              END OF ROADMAP
+   Print this. Check off items. Build in order. Do not skip phases.
+================================================================================

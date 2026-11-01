@@ -14,7 +14,7 @@ from app.core.constants import (
 from app.schemas.chat import AskRequest, AskResponse
 from app.services.model import generate
 from app.services.prompts import build_prompt
-from app.services.rag import retrieve
+from app.services.rag import grounding_ok, retrieve
 from app.services.safety import is_risky, safe_response
 from app.services.triage import classify_triage
 from app.utils.text import clean_query
@@ -46,6 +46,20 @@ async def ask(request: AskRequest) -> AskResponse:
     contexts = retrieve(
         query, k=settings.RAG_TOP_K, threshold=settings.RAG_SCORE_THRESHOLD
     )
+
+    # Grounding gate: refuse honestly when retrieval is weak rather than
+    # letting the LLM improvise on a medical topic.
+    if not grounding_ok(contexts):
+        return AskResponse(
+            query=query,
+            answer=NO_MATCH_ANSWER,
+            sources=[],
+            confidence=round(contexts[0].get("score", 0), 3) if contexts else 0.0,
+            latency=round(time.perf_counter() - started, 3),
+            triage=triage,
+            disclaimer=MEDICAL_DISCLAIMER,
+        )
+
     if contexts:
         contexts = sorted(
             contexts, key=lambda item: item.get("score", 0), reverse=True

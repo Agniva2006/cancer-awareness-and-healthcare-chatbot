@@ -1,0 +1,380 @@
+[
+  {
+    "id": "LUNG-001",
+    "title": "What Is Lung Cancer?",
+    "category": "types",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Cancer Society",
+    "content": "Lung cancer starts when cells in the lung grow out of control and form a tumor. It is the leading cause of cancer death worldwide, but it is often treatable, especially when found early. There are two main types: non-small cell lung cancer (NSCLC), which makes up about 80-85% of cases, and small cell lung cancer (SCLC), which makes up about 10-15% and tends to grow faster. Treatment and outlook depend on the type, the stage, and the specific genetic changes (biomarkers) found in the tumor."
+  },
+  {
+    "id": "LUNG-002",
+    "title": "Non-Small Cell Lung Cancer (NSCLC) Overview",
+    "category": "types",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "National Cancer Institute PDQ",
+    "content": "Non-small cell lung cancer (NSCLC) is the most common type of lung cancer, accounting for 80-85% of all cases. NSCLC has three main subtypes: adenocarcinoma (the most common, often found in the outer parts of the lung and in non-smokers), squamous cell carcinoma (usually found in the central airways, linked to smoking), and large cell carcinoma (less common, can appear anywhere in the lung). NSCLC generally grows more slowly than small cell lung cancer. Treatment options include surgery, radiation, chemotherapy, targeted therapy, and immunotherapy, chosen based on stage and molecular testing results."
+  },
+  {
+    "id": "LUNG-003",
+    "title": "Lung Adenocarcinoma",
+    "category": "types",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines for Patients: NSCLC",
+    "content": "Adenocarcinoma is the most common subtype of non-small cell lung cancer, making up about 40% of NSCLC cases. It starts in the mucus-producing gland cells of the lung, usually in the outer portions. Adenocarcinoma is the type most often seen in people who have never smoked, in younger patients, and in women. It is also the subtype most likely to have targetable biomarkers such as EGFR mutations, ALK rearrangements, ROS1 rearrangements, and MET exon 14 skipping, which is why molecular testing is essential at diagnosis."
+  },
+  {
+    "id": "LUNG-004",
+    "title": "Lung Squamous Cell Carcinoma",
+    "category": "types",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines for Patients: NSCLC",
+    "content": "Squamous cell carcinoma (also called epidermoid carcinoma) accounts for about 25-30% of non-small cell lung cancers. It starts in flat cells called squamous cells that line the airways, and is usually found in the central part of the lungs near the main airways. It is strongly linked to a history of smoking. Symptoms often include cough and coughing up blood because the tumor is near the airway. Squamous cell lung cancer has fewer targetable biomarkers than adenocarcinoma, but immunotherapy and chemotherapy are common treatments."
+  },
+  {
+    "id": "LUNG-005",
+    "title": "Small Cell Lung Cancer (SCLC) Overview",
+    "category": "types",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Cancer Society",
+    "content": "Small cell lung cancer (SCLC) accounts for about 10-15% of lung cancers and tends to grow and spread quickly. It is almost always associated with smoking. SCLC is staged differently from NSCLC: limited stage means the cancer is confined to one side of the chest and can be treated with one radiation field, while extensive stage means it has spread beyond that. Limited-stage SCLC is treated with chemotherapy and radiation together, often followed by prophylactic cranial irradiation to reduce the risk of brain metastases. Extensive-stage SCLC is treated mainly with chemotherapy combined with immunotherapy (atezolizumab or durvalumab)."
+  },
+  {
+    "id": "LUNG-006",
+    "title": "Who Should Be Screened for Lung Cancer (USPSTF Criteria)",
+    "category": "screening",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "US Preventive Services Task Force 2021",
+    "content": "Annual lung cancer screening with low-dose CT is recommended for adults who meet ALL of these criteria: age 50 to 80 years, at least a 20 pack-year smoking history (for example, smoking one pack a day for 20 years, or two packs a day for 10 years), and currently smoke or have quit within the past 15 years. Screening should stop once a person has not smoked for 15 years, or develops a health problem that limits life expectancy or the ability to have lung surgery. Talk to your doctor about whether screening is right for you; it is a shared decision."
+  },
+  {
+    "id": "LUNG-007",
+    "title": "Low-Dose CT Screening vs Chest X-Ray",
+    "category": "screening",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "National Lung Screening Trial (NLST)",
+    "content": "Low-dose computed tomography (LDCT) is the only screening test proven to reduce lung cancer deaths in high-risk people. The National Lung Screening Trial showed that LDCT reduced lung cancer mortality by about 20% compared with chest X-ray in high-risk individuals. A chest X-ray alone is not recommended for lung cancer screening because it misses small tumors. LDCT uses much less radiation than a standard CT scan and takes only a few minutes, with no needles or contrast dye required for screening scans."
+  },
+  {
+    "id": "LUNG-008",
+    "title": "What Happens After a Suspicious Lung Nodule Is Found",
+    "category": "screening",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "Fleischner Society Guidelines",
+    "content": "Finding a lung nodule on a scan is common and most nodules are not cancer. The next steps depend mainly on the nodule's size, shape, and growth over time. Small nodules (below 6 mm) in low-risk patients usually need no follow-up. Nodules 6-8 mm are often re-scanned with CT in 3-12 months. Larger nodules (above 8 mm) may need a PET-CT scan, a biopsy, or removal. Solid, part-solid, and ground-glass nodules follow different follow-up timelines. Your care team compares your scan with any previous scans, because a nodule that has not grown over two years is very unlikely to be cancer."
+  },
+  {
+    "id": "LUNG-009",
+    "title": "Types of Lung Nodules: Solid, Part-Solid, Ground-Glass",
+    "category": "screening",
+    "cancer_type": "lung",
+    "difficulty": "professional",
+    "source": "Fleischner Society Glossary",
+    "content": "Lung nodules are described by their density on CT. Solid nodules are uniformly dense and hide underlying lung structures; they have the highest malignancy risk per size. Part-solid (subsolid) nodules have both solid and ground-glass components; the solid component's size predicts malignancy risk and invasion. Pure ground-glass opacities (GGOs) are hazy areas that do not hide underlying vessels; they often grow slowly and may represent adenocarcinoma in situ or atypical adenomatous hyperplasia. Ground-glass nodules are typically followed for years, since doubling can take a long time. Persistent part-solid nodules with a solid component above 6 mm warrant further evaluation."
+  },
+  {
+    "id": "LUNG-010",
+    "title": "Lung Cancer Symptoms to Know",
+    "category": "diagnosis",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Cancer Society",
+    "content": "Early lung cancer often has no symptoms, which is why screening matters for people at high risk. When symptoms appear they can include: a cough that does not go away or gets worse over more than three weeks, coughing up blood (even a small amount), chest pain that is worse with deep breathing, laughing, or coughing, hoarseness, shortness of breath, wheezing, repeated chest infections that keep coming back, unexplained weight loss and loss of appetite, and bone pain. Having one of these symptoms does not mean you have lung cancer, but see a doctor promptly, especially if you are at higher risk."
+  },
+  {
+    "id": "LUNG-011",
+    "title": "Coughing Up Blood (Hemoptysis) — When to Seek Help",
+    "category": "diagnosis",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "BMJ Best Practice",
+    "content": "Coughing up blood, called hemoptysis, should always be evaluated by a doctor. Common causes include bronchitis and infections, but it can also be a sign of lung cancer, especially in people who smoke. Seek emergency care immediately if you are coughing up large amounts of blood, if bleeding will not stop, or if you also have severe shortness of breath, chest pain, or feel faint. For small streaks of blood in sputum, see a doctor within days for a chest evaluation, which usually includes imaging such as a chest X-ray or CT scan."
+  },
+  {
+    "id": "LUNG-012",
+    "title": "Chest X-Ray, CT, and PET-CT: What Each Scan Shows",
+    "category": "diagnosis",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "RadiologyInfo.org (RSNA)",
+    "content": "A chest X-ray is often the first test but cannot detect small or early tumors. A CT scan of the chest provides detailed cross-sectional images and is the standard test for evaluating suspected lung cancer, showing the tumor's size, location, and whether lymph nodes look involved. A PET-CT scan shows where cells are metabolically active, helping to reveal whether cancer has spread to lymph nodes or other organs; it is usually done before treatment decisions. MRI is mainly used when the tumor is near the top of the lung or if the brain or spine needs evaluation. Contrast dye may be used in some scans; tell your team about kidney problems or allergies."
+  },
+  {
+    "id": "LUNG-013",
+    "title": "How Lung Cancer Is Diagnosed: Biopsy Types",
+    "category": "diagnosis",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines for Patients: NSCLC",
+    "content": "Lung cancer can only be confirmed by examining tissue, which is called a biopsy. Options include: bronchoscopy (a thin camera passed through the airway, useful for central tumors), EBUS-TBNA (an ultrasound-guided bronchoscope that samples lymph nodes in the chest for staging), CT-guided needle biopsy (a radiologist inserts a needle through the chest wall, useful for outer tumors), thoracoscopy or VATS (keyhole surgery for samples that other methods cannot reach), and sputum cytology in selected cases. Your team chooses the method based on where the tumor is and what question needs answering, ideally using one test that both diagnoses and stages."
+  },
+  {
+    "id": "LUNG-014",
+    "title": "Molecular Testing (NGS) in Lung Cancer: What Gets Tested and Why",
+    "category": "diagnosis",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "CAP/IASLC/AMP Molecular Testing Guidelines",
+    "content": "Every non-squamous non-small cell lung cancer should have molecular testing, also called next-generation sequencing or NGS, done on the biopsy sample. Testing looks for changes in genes such as EGFR, ALK, ROS1, BRAF, KRAS, MET, RET, NTRK, and HER2, and measures PD-L1 protein levels. This matters because specific mutations have approved targeted pills that work far better than chemotherapy for those tumors. Testing can be done even on small samples and does not require an additional procedure if tissue was already collected. Ask your doctor whether comprehensive molecular testing was done on your tumor, since finding a targetable mutation can completely change your treatment plan."
+  },
+  {
+    "id": "LUNG-015",
+    "title": "TNM Staging in Lung Cancer Explained Simply",
+    "category": "staging",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "IASLC TNM 8th Edition",
+    "content": "Lung cancer staging uses the TNM system. T describes the tumor: its size and whether it has grown into nearby structures (T1 is 3 cm or smaller, up to T4 for very large or invasive tumors). N describes lymph nodes: whether cancer cells have reached nearby lymph nodes (N0 means none involved, up to N3 for nodes on the other side of the chest or above the collarbone). M describes metastasis: M0 means no spread to other organs, M1 means spread, for example to the other lung, bones, liver, adrenal glands, or brain. The T, N, and M values combine to give an overall stage from I to IV."
+  },
+  {
+    "id": "LUNG-016",
+    "title": "NSCLC Stages I-IV in Plain Language",
+    "category": "staging",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines for Patients: NSCLC",
+    "content": "Stage I: the tumor is small and confined to the lung, with no lymph node involvement. Surgery is the main treatment and many people are cured; some also receive chemotherapy or targeted therapy afterwards to reduce recurrence risk. Stage II: a larger tumor or spread to nearby lymph nodes within the lung; treatment is usually surgery followed by additional therapy. Stage III: cancer has spread to lymph nodes in the middle of the chest; this is a complex stage, often treated with chemotherapy and radiation together, followed by durvalumab immunotherapy. Stage IV: cancer has spread to another part of the body; treatment focuses on systemic therapy — targeted pills if a mutation is found, or immunotherapy with or without chemotherapy. Even stage IV can often be controlled for years with modern treatments."
+  },
+  {
+    "id": "LUNG-017",
+    "title": "SCLC Staging: Limited vs Extensive Stage",
+    "category": "staging",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Cancer Society",
+    "content": "Small cell lung cancer uses a simpler two-stage system. Limited stage means the cancer is on one side of the chest, fits within a single radiation field, and can typically be encompassed by radiation therapy; about one in three SCLC patients have limited-stage disease. Extensive stage means the cancer has spread beyond one lung, to the other lung, to lymph nodes on the other side of the chest, or to distant organs; about two in three patients have extensive-stage disease at diagnosis. The distinction matters because treatment differs: limited stage may be cured with combined chemotherapy and radiation, while extensive stage is treated with systemic therapy aiming to control the disease."
+  },
+  {
+    "id": "LUNG-018",
+    "title": "EGFR Mutations and Osimertinib in NSCLC",
+    "category": "biomarkers",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines / FLAURA Trial",
+    "content": "EGFR mutations are found in about 10-15% of NSCLC in Western populations and up to 50% in East Asian populations, most commonly in adenocarcinoma, never-smokers, and women. Common sensitizing mutations are exon 19 deletion and L858R point mutation. Tumors with these mutations respond dramatically to EGFR inhibitor pills called tyrosine kinase inhibitors. Osimertinib, a third-generation EGFR inhibitor, is the preferred first-line treatment based on the FLAURA trial, which showed it works better and has fewer side effects than older EGFR drugs, with improved survival. Common side effects include rash, diarrhea, and dry skin. If cancer progresses on treatment, a repeat biopsy may reveal resistance mutations such as T790M or C797S that guide the next therapy."
+  },
+  {
+    "id": "LUNG-019",
+    "title": "ALK Rearrangements and Targeted Therapy (Alectinib, Lorlatinib)",
+    "category": "biomarkers",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines / ALEX Trial",
+    "content": "ALK rearrangements occur in about 3-5% of NSCLC, typically in adenocarcinoma, younger patients, and never or light smokers. ALK-positive lung cancers respond exceptionally well to ALK inhibitor pills. Alectinib is the preferred first-line treatment based on the ALEX trial, showing excellent brain penetration and control of disease. Lorlatinib is a next-generation option for resistant disease, including tumors that spread to the brain. Side effects can include vision changes, swelling of the ankles, and elevated cholesterol, which is monitored with blood tests. ALK-positive patients often live many years on sequential targeted therapies, making ALK one of the most treatable lung cancer subtypes when matched to the right drug."
+  },
+  {
+    "id": "LUNG-020",
+    "title": "KRAS G12C Mutations: Sotorasib and Adagrasib",
+    "category": "biomarkers",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "CodeBreaK-100 and KRYSTAL-1 Trials",
+    "content": "KRAS mutations are the most common oncogenic driver in lung adenocarcinoma, found in about 25% of cases. For decades KRAS was considered undruggable, but that changed with KRAS G12C-specific inhibitors. Sotorasib and adagrasib are oral drugs approved for previously treated KRAS G12C-mutated NSCLC, offering tumor shrinkage in roughly 40% of treated patients. KRAS mutations other than G12C currently have no dedicated targeted drugs, though combinations with immunotherapy are studied. Testing for KRAS G12C is part of standard comprehensive molecular profiling, and patients with KRAS mutations often also benefit from immunotherapy depending on PD-L1 levels."
+  },
+  {
+    "id": "LUNG-021",
+    "title": "ROS1, RET, MET Exon 14, BRAF, NTRK: Other Targetable Alterations",
+    "category": "biomarkers",
+    "cancer_type": "lung",
+    "difficulty": "professional",
+    "source": "NCCN Guidelines for NSCLC",
+    "content": "Beyond EGFR, ALK, and KRAS, several actionable alterations exist in NSCLC. ROS1 rearrangements (1-2% of NSCLC) respond to crizotinib, entrectinib, and repotrectinib. RET fusions (1-2%) are highly sensitive to selpercatinib and pralsetinib. MET exon 14 skipping mutations (3%) respond to capmatinib and tepotinib; MET amplifications are being studied. BRAF V600E mutations (1-2%) respond to the combination of dabrafenib plus trametinib. NTRK fusions are rare but respond to larotrectinib and entrectinib. HER2 mutations can be treated with trastuzumab deruxtecan, an antibody-drug conjugate. Each of these is why comprehensive NGS panel testing at diagnosis is essential: a single blood or tissue test can reveal multiple treatment options."
+  },
+  {
+    "id": "LUNG-022",
+    "title": "PD-L1 Testing and What the Score Means",
+    "category": "biomarkers",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines / KEYNOTE Trials",
+    "content": "PD-L1 is a protein that some cancer cells use to hide from the immune system. Tumors are tested for PD-L1 using a staining score called Tumor Proportion Score (TPS), ranging from 0% to 100%. Higher PD-L1 expression generally predicts better response to immunotherapy drugs called checkpoint inhibitors. A TPS of 50% or higher typically supports using pembrolizumab alone as first-line therapy. Lower or negative PD-L1 levels usually lead to immunotherapy combined with chemotherapy, which works regardless of PD-L1 level. PD-L1 is imperfect: some PD-L1-negative tumors still respond, and some PD-L1-high tumors do not, so your oncologist weighs it together with other factors."
+  },
+  {
+    "id": "LUNG-023",
+    "title": "Immunotherapy for Lung Cancer: How Checkpoint Inhibitors Work",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Cancer Society",
+    "content": "Immunotherapy helps your own immune system recognize and attack cancer cells. Cancer cells often display a protein called PD-L1 that acts like a brake on immune cells. Checkpoint inhibitor drugs release that brake: pembrolizumab, nivolumab, atezolizumab, cemiplimab, and durvalumab are examples used in lung cancer. These drugs are given by IV, typically every 2 to 6 weeks. They can produce long-lasting responses in a subset of patients and have changed the outlook for advanced NSCLC. Because they remove immune brakes, they can cause the immune system to attack healthy organs too, producing side effects called immune-related adverse events, which are usually manageable when recognized early."
+  },
+  {
+    "id": "LUNG-024",
+    "title": "Durvalumab After Chemoradiation for Stage III NSCLC",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "PACIFIC Trial",
+    "content": "For stage III NSCLC that cannot be removed by surgery, the standard treatment is chemotherapy given together with radiation (chemoradiation), followed by a maintenance immunotherapy drug called durvalumab. The PACIFIC trial showed that adding durvalumab for up to 12 months after chemoradiation significantly delayed cancer progression and improved survival. This approach is now standard care. Durvalumab is given by IV every 2 to 4 weeks. Common side effects include fatigue, cough, and skin rash; like all immunotherapies, it can cause immune-related inflammation of the lungs, thyroid, liver, or colon, which your team monitors with blood tests and symptom reviews."
+  },
+  {
+    "id": "LUNG-025",
+    "title": "Lung Cancer Surgery: Lobectomy, Segmentectomy, Wedge Resection",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines for Patients: NSCLC",
+    "content": "For early-stage NSCLC (stage I and some stage II), surgery offers the best chance of cure. A lobectomy removes one of the lung's five lobes and is the standard operation when the tumor is confined to one lobe. A segmentectomy or wedge resection removes a smaller portion of lung and may be used for very small tumors or for patients with limited lung reserve. Surgery is done either by VATS (video-assisted thoracoscopic surgery, keyhole technique with faster recovery) or by open thoracotomy in specific situations. Nearby lymph nodes are sampled during surgery to confirm the stage. Recovery takes weeks; most people return to normal activities, though some shortness of breath can persist, especially if lung function was reduced before surgery."
+  },
+  {
+    "id": "LUNG-026",
+    "title": "SBRT: Stereotactic Body Radiation Therapy for Early Lung Cancer",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines / ASTRO",
+    "content": "SBRT (stereotactic body radiation therapy) delivers very high doses of precisely targeted radiation in just 3 to 5 sessions, instead of 30 or more with conventional radiation. For patients with small stage I lung tumors who cannot or do not want surgery, SBRT achieves local control rates above 90% and is considered the standard of care. It is non-invasive, done as an outpatient, and each session lasts under an hour. Common side effects are fatigue and temporary inflammation near the treated area; serious complications like radiation pneumonitis are uncommon but possible. Follow-up CT scans track the treated area, which can show scar-like changes that radiologists distinguish from recurrence."
+  },
+  {
+    "id": "LUNG-027",
+    "title": "Chemotherapy for Lung Cancer: What to Expect",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Cancer Society",
+    "content": "Chemotherapy uses drugs that kill rapidly dividing cells and is given through a vein in cycles, usually every 3 weeks, allowing the body to recover between doses. For lung cancer, the most common regimens combine a platinum drug (cisplatin or carboplatin) with a second agent such as pemetrexed (for nonsquamous tumors), paclitaxel, or docetaxel. Chemotherapy may be given before surgery to shrink tumors, after surgery to reduce recurrence risk, combined with radiation for stage III disease, or with immunotherapy for stage IV. Common side effects include fatigue, nausea (well controlled with modern medications), hair loss with certain drugs, mouth sores, low blood counts raising infection risk, and nerve damage causing numbness in hands and feet. Most side effects are temporary and manageable."
+  },
+  {
+    "id": "LUNG-028",
+    "title": "Antibody-Drug Conjugates (ADCs) in Lung Cancer",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "professional",
+    "source": "TROPION-Lung01 and DESTINY-Lung Trials",
+    "content": "Antibody-drug conjugates combine an antibody that targets a protein on cancer cells with a potent chemotherapy payload, delivering the drug directly to the tumor. Trastuzumab deruxtecan targets HER2 mutations and is approved for HER2-mutant NSCLC. Datopotamab deruxtecan targets TROP2 and is in advanced trials for NSCLC. ADCs can work where conventional treatments have failed. Watch for interstitial lung disease, which is a class-effect risk for deruxtecans and requires immediate evaluation if new breathlessness or cough develops. Other toxicities include nausea, stomatitis, and lowered blood counts."
+  },
+  {
+    "id": "LUNG-029",
+    "title": "Febrile Neutropenia: An Emergency During Cancer Treatment",
+    "category": "emergency_triage",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Guidelines / IDSA",
+    "content": "Fever during chemotherapy can signal a dangerously low white blood cell count, called febrile neutropenia, and is a medical emergency. Definition: a single oral temperature of 100.4°F (38.3°C) or higher, or 100.0°F (37.8°C) sustained for over an hour, in a patient receiving chemotherapy. Seek emergency care immediately, do not wait to see if the fever passes, and tell the team you are on chemotherapy. Treatment requires IV antibiotics within one hour. Preventive measures include washing hands often, avoiding crowds during chemo nadir days (usually 7-14 days after each dose), and monitoring temperature at home. Your team may prescribe growth-factor injections to boost white cells in high-risk regimens."
+  },
+  {
+    "id": "LUNG-030",
+    "title": "Superior Vena Cava (SVC) Syndrome: Oncologic Emergency",
+    "category": "emergency_triage",
+    "cancer_type": "lung",
+    "difficulty": "professional",
+    "source": "NCCN Guidelines",
+    "content": "SVC syndrome occurs when a tumor, most commonly a right-sided upper-lobe lung cancer or mediastinal lymphadenopathy, compresses the superior vena cava, blocking venous return from the head, neck, and arms. Signs include facial swelling and plethora, distended neck veins, arm edema, dyspnea, and orthopnea. It is a clinical diagnosis supported by CT venography. Management depends on underlying cause and severity: elevate the head, corticosteroids for edema, endovascular stent placement for rapid symptom relief, chemotherapy or radiation for chemosensitive disease, and anticoagulation when an underlying thrombus is present. SVC syndrome is rarely immediately life-threatening except with airway compromise or laryngeal edema, but requires urgent oncologic evaluation."
+  },
+  {
+    "id": "LUNG-031",
+    "title": "Immunotherapy Side Effects (irAEs): What Patients Must Know",
+    "category": "side_effects",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "SITC / NCCN Guidelines",
+    "content": "Because checkpoint inhibitors release the brakes on the immune system, they can cause inflammation in any organ, called immune-related adverse events (irAEs). The most important ones to know: pneumonitis (inflammation of the lungs; new or worsening shortness of breath or cough needs immediate contact with your team), colitis (diarrhea, sometimes severe; report more than 4 loose stools a day), thyroid problems (either overactive or underactive, detected on blood tests), hepatitis (elevated liver enzymes), hypophysitis (pituitary inflammation causing profound fatigue and low blood pressure), and type 1 diabetes (rare, presents with thirst and confusion). Most irAEs are mild and treated by holding immunotherapy and giving steroids. Report any new symptom to your oncology team promptly; early treatment keeps them manageable."
+  },
+  {
+    "id": "LUNG-032",
+    "title": "Chemotherapy Side Effects and Practical Management",
+    "category": "side_effects",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "Oncology Nursing Society",
+    "content": "Common chemotherapy side effects and how to manage them: nausea and vomiting (take anti-nausea medications exactly as prescribed, eat small frequent meals, ginger can help); fatigue (balance activity with rest; light exercise such as walking often helps); hair loss (occurs with paclitaxel and docetaxel, not with pemetrexed; consider a cold cap); mouth sores (salt-water rinses, avoid spicy and acidic foods, call if you cannot eat or drink); low blood counts (wash hands, avoid sick contacts, check temperature for fever); neuropathy (numbness or tingling in hands and feet, report early because dose adjustments help); and constipation (common with certain anti-nausea drugs, stay hydrated, use prescribed laxatives early). Call your team for fever of 100.4°F or higher, uncontrolled vomiting or diarrhea, or any bleeding."
+  },
+  {
+    "id": "LUNG-033",
+    "title": "Radiation Therapy Side Effects for Lung Cancer",
+    "category": "side_effects",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Society for Radiation Oncology",
+    "content": "Radiation to the chest can cause side effects during and after treatment: skin redness in the treated area like a sunburn, fatigue that builds gradually, esophagitis (pain or burning when swallowing, typically worst in weeks 2-5 of treatment; soft foods, cool drinks, and prescribed pain rinses help), radiation pneumonitis (dry cough, mild breathlessness, or low-grade fever weeks to months after treatment; report it, as it responds well to steroids when caught early), and long-term scarring (fibrosis) which shows on scans. Modern techniques like SBRT and IMRT precisely target tumors, limiting doses to healthy lung, esophagus, and heart, which greatly reduces these effects."
+  },
+  {
+    "id": "LUNG-034",
+    "title": "Targeted Therapy Side Effects: EGFR, ALK, and Other TKIs",
+    "category": "side_effects",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "Oncology Nursing Society",
+    "content": "Targeted pills have different side effects from chemotherapy. EGFR inhibitors (osimertinib, erlotinib): acne-like rash on the face and chest (use fragrance-free moisturizer, prescribed topical antibiotics help), diarrhea, dry skin and cracked fingertips, and nail inflammation. Rare but serious: interstitial lung disease, which presents as new cough or breathlessness and needs immediate evaluation. ALK inhibitors (alectinib, lorlatinib): vision changes (flashes or halos, usually harmless), ankle swelling, elevated cholesterol and triglycerides needing blood monitoring, and with lorlatinib, possible brain effects like confusion or word-finding difficulty. Most side effects are dose-manageable rather than treatment-ending; never stop a targeted pill without talking to your oncologist."
+  },
+  {
+    "id": "LUNG-035",
+    "title": "Superior Vena Cava and Other Paraneoplastic Syndromes",
+    "category": "diagnosis",
+    "cancer_type": "lung",
+    "difficulty": "professional",
+    "source": "Journal of Thoracic Oncology Review",
+    "content": "Lung cancers, especially SCLC and squamous NSCLC, can produce symptoms through hormones or immune effects rather than direct tumor growth, called paraneoplastic syndromes. SIADH (syndrome of inappropriate antidiuretic hormone) causes low sodium, confusion, and weakness; it is common in SCLC and managed with fluid restriction and sometimes demeclocycline or vasopressin antagonists. Lambert-Eaton myasthenic syndrome causes proximal leg weakness and autonomic symptoms; it is paraneoplastic in SCLC and improves with treatment of the tumor. Humoral hypercalcemia from PTHrP secretion occurs mainly in squamous carcinoma, causing confusion, constipation, and dehydration; treatment is IV fluids plus bisphosphonates. Recognizing these syndromes matters because they can precede radiographic diagnosis and because correcting them improves quality of life."
+  },
+  {
+    "id": "LUNG-036",
+    "title": "Quitting Smoking After a Lung Cancer Diagnosis",
+    "category": "supportive",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "CDC / American Lung Association",
+    "content": "Quitting smoking after a lung cancer diagnosis matters at every stage of treatment. Continuing to smoke is associated with worse surgical outcomes, reduced effectiveness of chemotherapy and radiation, higher complication rates, and increased risk of second cancers. Quitting at any point improves outcomes. Evidence-based methods combine behavioral support with medication: nicotine replacement (patch, gum, lozenges), varenicline, or bupropion; combining counseling with medication roughly doubles success rates compared with either alone. Free resources include 1-800-QUIT-NOW telephone coaching and smokefree.gov. If you feel guilt or shame about smoking, know that no one deserves lung cancer and that your care team's goal is to support you, not to judge."
+  },
+  {
+    "id": "LUNG-037",
+    "title": "Nutrition During Lung Cancer Treatment",
+    "category": "supportive",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "Academy of Nutrition and Dietetics",
+    "content": "Good nutrition helps you tolerate treatment and recover. Practical guidance: eat small frequent meals rather than three large ones, prioritize protein at every meal (eggs, dairy, legumes, poultry, fish) to maintain muscle, keep easy snacks available for low-appetite days, and manage taste changes by trying cold foods, plastic utensils if metal tastes metallic, and flavoring with herbs and lemon. Weight loss is common; a dietitian on your cancer team can help with supplements or feeding strategies. Maintain hydration, especially on chemotherapy days. Alcohol should be minimized. There is no single anti-cancer diet; unproven restrictive diets can cause harmful weight loss during treatment, so discuss any supplement or major diet change with your oncology team first."
+  },
+  {
+    "id": "LUNG-038",
+    "title": "Palliative Care Is Not Hospice: Early Support Improves Quality of Life",
+    "category": "supportive",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "ASCO / Temel et al. NEJM 2010",
+    "content": "Palliative care is specialized medical care focused on symptom relief, comfort, and quality of life, and it can be received at the same time as active cancer treatment, not just at the end of life. A landmark study in patients with newly diagnosed metastatic NSCLC showed that early palliative care improved quality of life, reduced depression, and even extended survival. Palliative teams help with pain, breathlessness, anxiety, sleep, nausea, and coordinating care among specialists. Hospice is a specific form of palliative care for people nearing the end of life when treatment is no longer helping, usually with a prognosis of six months or less. Asking for palliative care does not mean giving up; it means adding a team whose entire focus is on how you feel day to day."
+  },
+  {
+    "id": "LUNG-039",
+    "title": "Questions to Ask Your Oncologist at Diagnosis",
+    "category": "supportive",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "GO2 for Lung Cancer",
+    "content": "Useful questions to bring to appointments: What type and stage of lung cancer do I have, and what does that mean? Was comprehensive molecular testing done, and what were the results, including PD-L1? What is the goal of treatment: cure, long-term control, or symptom relief? What treatment do you recommend and why this one? What are the side effects and how are they managed? Are there clinical trials appropriate for me, here or elsewhere? Should I have a PET scan or brain MRI before treatment? Who do I call if I feel worse, and is there a 24-hour number? Can I get a second opinion? Can I meet with a palliative care team, dietitian, or social worker? Bring someone to appointments, record conversations if allowed, and ask for written summaries."
+  },
+  {
+    "id": "LUNG-040",
+    "title": "Clinical Trials for Lung Cancer: What They Are and How to Find Them",
+    "category": "treatment",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "National Cancer Institute",
+    "content": "Clinical trials are research studies testing new treatments or new ways to use existing ones, and they give access to options not yet widely available. Phases: Phase 1 tests safety and dosing in small groups, Phase 2 tests whether the treatment works for a specific cancer, and Phase 3 compares the new treatment against the current standard. Joining a phase 3 trial often means receiving either the standard treatment or the new one, both of which are active options. Trials have strict safety oversight and informed consent; you can leave at any time. Search tools include clinicaltrials.gov and the NCI-matched trials platforms. Ask your oncologist about trials specific to your biomarker, for example ALK-positive or KRAS G12C trials, since targeted therapy trials often look for specific mutations."
+  },
+  {
+    "id": "LUNG-041",
+    "title": "Brain Metastases in Lung Cancer: What Patients Should Know",
+    "category": "types",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "American Society for Radiation Oncology",
+    "content": "Lung cancer is the most common cancer to spread to the brain, and this happens in a substantial portion of stage IV patients. Symptoms can include new or worsening headaches, especially in the morning, seizures, weakness or numbness on one side, speech difficulty, vision changes, or personality changes; report these promptly. Diagnosis is by brain MRI with contrast. Treatment depends on the number and size of metastases: stereotactic radiosurgery (SRS) precisely treats one to several lesions while sparing healthy brain, whole-brain radiation is used for many metastases, surgery removes larger or symptomatic lesions, and some targeted drugs and immunotherapies penetrate the brain effectively, particularly lorlatinib for ALK-positive and osimertinib for EGFR-mutant disease. Many brain metastases are now controlled for long periods."
+  },
+  {
+    "id": "LUNG-042",
+    "title": "Second Primary Lung Cancers and Surveillance After Treatment",
+    "category": "staging",
+    "cancer_type": "lung",
+    "difficulty": "patient",
+    "source": "NCCN Surveillance Guidelines",
+    "content": "After curative treatment for early-stage lung cancer, regular follow-up detects recurrence or a new lung cancer early, when it is treatable. Standard surveillance includes CT chest scans every 6 months for the first 2 to 3 years, then annually, along with clinical visits. Report new cough, chest pain, weight loss, or breathlessness between scheduled scans rather than waiting. Unlike many cancers, lung cancer survivors are also at risk of a second, new primary lung cancer because the whole lung field was exposed to carcinogens; this is why continued annual screening-style CT is used. Survivors should also receive recommended vaccines, keep up general health care, and continue smoking cessation support if applicable."
+  }
+]

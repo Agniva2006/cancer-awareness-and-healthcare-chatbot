@@ -24,3 +24,6 @@ ENV/
 # OS artifacts
 .DS_Store
 Thumbs.db
+
+# Local dev SQLite database
+cancer_chatbot_dev.db

@@ -5,6 +5,13 @@ scikit-learn
 groq
 python-dotenv
 numpy
+sentence-transformers
+
+# Database
+sqlalchemy
+alembic
+psycopg[binary]
+pgvector
 
 # Dev / tooling
 pytest
