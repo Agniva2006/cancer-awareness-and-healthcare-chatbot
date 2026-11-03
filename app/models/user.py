@@ -24,6 +24,9 @@ class User(Base, TimestampMixin):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     sessions: Mapped[List["UserSession"]] = relationship(back_populates="user")
+    pending_actions: Mapped[List["PendingEmailAction"]] = relationship(
+        back_populates="user"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<User {self.email} role={self.role}>"
@@ -55,3 +58,33 @@ class UserSession(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="sessions")
+
+
+class PendingEmailAction(Base):
+    """Single-use tokens for email actions (verify address, reset password).
+
+    Tokens are stored HASHED (SHA-256); rows are deleted on use, and expiry is
+    enforced at read time. Append/delete only — never updated in place.
+    """
+
+    __tablename__ = "pending_email_actions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    action: Mapped[str] = mapped_column(String(40), nullable=False)  # verify_email|reset_password
+    token_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
+
+    user: Mapped[User] = relationship(back_populates="pending_actions")

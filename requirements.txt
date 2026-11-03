@@ -3,6 +3,7 @@ uvicorn
 pydantic
 scikit-learn
 groq
+openai
 python-dotenv
 numpy
 sentence-transformers
@@ -18,3 +19,12 @@ pytest
 httpx
 flake8
 black
+
+# Auth
+bcrypt
+PyJWT
+email-validator
+
+# Billing (Phase 3) — SDK is optional at runtime; endpoints 503 cleanly
+# when the key is absent. Uncomment to enable Stripe checkout/webhooks.
+# stripe

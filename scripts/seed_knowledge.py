@@ -13,7 +13,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.config import settings  # noqa: E402
 from app.core.database import SessionLocal  # noqa: E402
-from app.models.knowledge import KnowledgeDocument  # noqa: E402
+from app.models.knowledge import (  # noqa: E402
+    KnowledgeDocument,
+    VECTOR_AVAILABLE,
+    EMBEDDING_DIM,
+)
+
+try:
+    from sentence_transformers import SentenceTransformer
+
+    _EMB_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+except Exception:  # pragma: no cover
+    _EMB_MODEL = None
 
 CATEGORY_FALLBACK = "general"
 
@@ -62,17 +73,21 @@ def seed(reset: bool = False) -> None:
                 skipped += 1
                 continue
 
-            db.add(
-                KnowledgeDocument(
-                    title=title,
-                    content=content,
-                    source=item.get("source", ""),
-                    category=item.get("category", CATEGORY_FALLBACK),
-                    cancer_type=item.get("cancer_type", "general"),
-                    difficulty="professional" if item.get("icd10") else "patient",
-                    external_key=ext_key,
-                )
+            doc = KnowledgeDocument(
+                title=title,
+                content=content,
+                source=item.get("source", ""),
+                category=item.get("category", CATEGORY_FALLBACK),
+                cancer_type=item.get("cancer_type", "general"),
+                difficulty="professional" if item.get("icd10") else "patient",
+                external_key=ext_key,
             )
+            if VECTOR_AVAILABLE and _EMB_MODEL is not None:
+                text = f"{title} {content}"
+                doc.embedding = _EMB_MODEL.encode(
+                    text, normalize_embeddings=True
+                ).tolist()
+            db.add(doc)
             added += 1
 
         db.commit()

@@ -41,10 +41,11 @@ def _uid() -> str:
 
 def test_user_crud_roundtrip():
     db = next(_db())
-    u = User(email=f"t1-{_uid()}@example.com", password_hash="x", role="patient")
+    email = f"t1-{_uid()}@example.com"
+    u = User(email=email, password_hash="x", role="patient")
     db.add(u)
     db.commit()
-    found = db.query(User).filter_by(email="t1@example.com").one()
+    found = db.query(User).filter_by(email=email).one()
     assert found.id and found.created_at is not None
 
 

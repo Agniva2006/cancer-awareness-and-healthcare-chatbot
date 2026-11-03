@@ -1,10 +1,15 @@
-"""Chat question-answering endpoint."""
+"""Chat question-answering endpoint (authenticated)."""
 
 import logging
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.models.user import User
+from app.services import quota as quota_service
 from app.core.config import settings
 from app.core.constants import (
     LLM_FAILURE_SENTINEL,
@@ -24,10 +29,26 @@ router = APIRouter()
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask(request: AskRequest) -> AskResponse:
+async def ask(
+    request: AskRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AskResponse:
     """Answer a cancer-awareness question with RAG + LLM, guarded by safety and triage."""
     started = time.perf_counter()
     query = clean_query(request.query)
+
+    # Server-side quota enforcement (roadmap §3.6). Only successful answers
+    # are counted, so blocked/grounding-refused requests below don't consume it.
+    allowed, used, limit = quota_service.check_quota(db, current_user.id)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Monthly quota reached ({used}/{limit}). Upgrade your plan at "
+                "/billing/checkout to continue."
+            ),
+        )
 
     triage = classify_triage(query)
 
@@ -77,6 +98,9 @@ async def ask(request: AskRequest) -> AskResponse:
             )
     else:
         answer = NO_MATCH_ANSWER
+
+    # Count the successful answer against the quota (post-success, never pre).
+    quota_service.record_usage(db, current_user.id)
 
     return AskResponse(
         query=query,

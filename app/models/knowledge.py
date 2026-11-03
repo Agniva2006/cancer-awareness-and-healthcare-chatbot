@@ -4,10 +4,22 @@ from typing import Optional
 
 from sqlalchemy import Boolean, String, Text
 
-try:  # pgvector is only usable with Postgres
+try:  # pgvector SDK present — but the SERVER must also have the extension
     from pgvector.sqlalchemy import Vector
 
-    VECTOR_AVAILABLE = True
+    from app.core.database import engine as _engine
+
+    def _server_has_vector() -> bool:
+        try:
+            with _engine.connect() as conn:
+                row = conn.exec_driver_sql(
+                    "SELECT count(*) FROM pg_extension WHERE extname = 'vector'"
+                ).fetchone()
+                return bool(row and row[0])
+        except Exception:
+            return False
+
+    VECTOR_AVAILABLE = _server_has_vector()
 except ImportError:  # pragma: no cover - sqlite/test environments
     Vector = None
     VECTOR_AVAILABLE = False
@@ -38,3 +50,7 @@ class KnowledgeDocument(Base, TimestampMixin):
 
     if VECTOR_AVAILABLE:
         embedding = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
+    else:
+        # Server lacks pgvector — no embedding column in the ORM at all,
+        # so queries/inserts never reference it.
+        embedding = None

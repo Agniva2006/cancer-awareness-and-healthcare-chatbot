@@ -108,3 +108,25 @@ class UsageEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+
+
+class BillingEvent(Base):
+    """Processed webhook events — idempotency guard.
+
+    Stripe (and every serious provider) may deliver the same event more than
+    once. Before applying any webhook side effect, the handler inserts a row
+    keyed by the provider event ID; a duplicate insert means "already done".
+    Append-only, never updated.
+    """
+
+    __tablename__ = "billing_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    provider: Mapped[str] = mapped_column(String(20), nullable=False)
+    provider_event_id: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow
+    )
