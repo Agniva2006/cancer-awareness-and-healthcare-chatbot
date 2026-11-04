@@ -12,13 +12,11 @@ import uuid
 _tmpdb = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmpdb.name}"
 
-from datetime import timedelta  # noqa: E402
-
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.database import Base, SessionLocal, engine  # noqa: E402
 from app.core.database import get_db as real_get_db  # noqa: E402
-from app.core.deps import get_current_user, require_role  # noqa: E402
+from app.core.deps import get_current_user, require_role  # noqa: F401, E402
 from app.core.security import (  # noqa: E402
     TokenExpiredError,
     create_access_token,
@@ -46,6 +44,7 @@ client = TestClient(app)
 
 def setup_function(function):
     rate_limiter.reset()
+
 
 PASSWORD = "Sup3rSecret99"
 
@@ -100,8 +99,7 @@ def test_jwt_roundtrip_and_expiry():
     payload = decode_access_token(token)
     assert payload["sub"] == "user-123"
     assert payload["role"] == "patient"
-    from app.core.config import settings
-    from app.core.security import _jwt_secret
+    from app.core.security import _jwt_secret  # noqa: F401
 
     expired = create_access_token("u", "patient", expires_minutes=-1)
     try:

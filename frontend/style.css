@@ -316,3 +316,39 @@ input,textarea,select{font-family:inherit;color:inherit;border:none;background:n
 #sidebar .sidebar-section + .sidebar-section { display: none !important; }
 .logo-version { display: none; }
 
+
+/* ===== AUTH MODAL (Phase 2 frontend) ===== */
+.modal-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-card {
+    background: var(--bg-secondary, #16181d); color: var(--text-primary, #e5e7eb);
+    border: 1px solid var(--border-color, #2a2d35); border-radius: 16px;
+    padding: 28px; width: min(420px, 92vw); position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.modal-card h2 { margin: 0 0 18px; font-size: 1.3rem; }
+.modal-close { position: absolute; top: 12px; right: 12px; }
+.auth-form { display: flex; flex-direction: column; gap: 12px; }
+.auth-form input {
+    padding: 12px 14px; border-radius: 10px;
+    border: 1px solid var(--border-color, #2a2d35);
+    background: var(--bg-primary, #0d0e12); color: inherit; font-size: 0.95rem;
+}
+.auth-form input:focus { outline: 2px solid var(--accent, #6366f1); border-color: transparent; }
+.auth-switch { font-size: 0.85rem; opacity: .8; margin: 4px 0 0; }
+.auth-switch a { color: var(--accent, #6366f1); }
+.auth-message { min-height: 1.2em; font-size: 0.9rem; margin: 10px 0 0; }
+#auth-btn { cursor: pointer; }
+
+/* ===== SOURCE CHIPS + QUOTA BAR ===== */
+.source-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.source-chip {
+    font-size: .75rem; padding: 3px 10px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent, #6366f1) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent, #6366f1) 35%, transparent);
+    opacity: .9;
+}
+.quota-bar { padding: 2px 4px; }

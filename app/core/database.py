@@ -1,5 +1,6 @@
 """SQLAlchemy database engine and session management."""
 
+import os
 from typing import Generator
 
 from sqlalchemy import create_engine
@@ -12,8 +13,11 @@ connect_args = (
     {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
 )
 
+# Tests set DATABASE_URL at runtime (after import-time config), so honor it.
+_db_url = os.environ.get("DATABASE_URL", settings.DATABASE_URL)
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    _db_url,
     echo=settings.DB_ECHO,
     connect_args=connect_args,
     pool_pre_ping=True,  # drops dead connections instead of erroring

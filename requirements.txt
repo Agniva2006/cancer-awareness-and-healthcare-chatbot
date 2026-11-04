@@ -25,6 +25,11 @@ bcrypt
 PyJWT
 email-validator
 
-# Billing (Phase 3) — SDK is optional at runtime; endpoints 503 cleanly
-# when the key is absent. Uncomment to enable Stripe checkout/webhooks.
-# stripe
+# Billing (Phase 3) — Stripe SDK for checkout + webhook signature verification
+stripe
+
+# Rate limiting / caching (Phase 5)
+redis
+
+# Error tracking (Phase 5, optional — no-op when SENTRY_DSN is empty)
+sentry-sdk[fastapi]

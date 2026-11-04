@@ -61,11 +61,20 @@ class Settings:
     )
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 
-    # ── Rate limiting (in-memory; swap for Redis in Phase 5) ──
+    # ── Rate limiting (Redis backend, in-memory fallback) ──
     AUTH_RATE_LIMIT_ATTEMPTS: int = int(os.getenv("AUTH_RATE_LIMIT_ATTEMPTS", "5"))
     AUTH_RATE_LIMIT_WINDOW_MINUTES: int = int(
         os.getenv("AUTH_RATE_LIMIT_WINDOW_MINUTES", "15")
     )
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+    REDIS_URL: str = os.getenv("REDIS_URL", "")
+
+    # ── Observability (Phase 5) ───────────────────────────
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+    LOG_FORMAT: str = os.getenv("LOG_FORMAT", "dev")  # dev | json
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "local")  # local|staging|production
 
     # ── Email ─────────────────────────────────────────────
     EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "console")
@@ -128,6 +137,10 @@ class _InMemoryRateLimiter:
         self._hits.clear()
 
 
-rate_limiter = _InMemoryRateLimiter()
+# Phase 5: resilient limiter — Redis counters with in-memory fallback.
+# Exposes .reset() so tests clear state the same way as before.
+from app.core.rate_limit import get_rate_limiter  # noqa: E402
+
+rate_limiter = get_rate_limiter()
 
 settings = Settings()

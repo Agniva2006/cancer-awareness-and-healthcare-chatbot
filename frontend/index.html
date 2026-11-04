@@ -55,6 +55,7 @@
 
             <div class="sidebar-section">
                 <div class="section-title"><span>&#x1F4CA; Platform Stats</span></div>
+                <div id="quota-bar" class="quota-bar" style="font-size:.85rem;opacity:.85;margin-bottom:8px"></div>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <span class="stat-value" id="stat-queries">0</span>
@@ -111,6 +112,11 @@
                         <span class="dot"></span>
                         <span class="status-text">Online</span>
                     </div>
+
+                    <button class="control-btn" id="auth-btn" title="Login or register">
+                        <span class="control-icon">&#x1F464;</span>
+                        <span class="control-label" id="auth-label">Sign in</span>
+                    </button>
                 </div>
             </header>
 
@@ -180,6 +186,38 @@
     </div>
 
     <div class="toast-container" id="toast-container"></div>
+
+    <!-- ========== AUTH MODAL ========== -->
+    <div class="modal-backdrop" id="auth-modal-backdrop" style="display:none">
+      <div class="modal-card" id="auth-modal">
+        <button class="icon-btn modal-close" id="auth-modal-close" aria-label="Close">&#x2715;</button>
+        <h2 id="auth-modal-title">Sign in</h2>
+
+        <form id="login-form" class="auth-form">
+          <input type="email" id="login-email" placeholder="Email" required autocomplete="email">
+          <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password" minlength="10">
+          <button type="submit" class="new-chat-btn" style="width:100%">Sign in</button>
+          <p class="auth-switch">No account? <a href="#" id="show-register">Create one</a> &middot; <a href="#" id="show-forgot">Forgot password?</a></p>
+        </form>
+
+        <form id="register-form" class="auth-form" style="display:none">
+          <input type="text" id="register-name" placeholder="Full name" autocomplete="name">
+          <input type="email" id="register-email" placeholder="Email" required autocomplete="email">
+          <input type="password" id="register-password" placeholder="Password (10+ chars, upper+lower+digit)" required autocomplete="new-password" minlength="10">
+          <button type="submit" class="new-chat-btn" style="width:100%">Create account</button>
+          <p class="auth-switch">Have an account? <a href="#" id="show-login">Sign in</a></p>
+        </form>
+
+        <form id="forgot-form" class="auth-form" style="display:none">
+          <p style="font-size:0.9rem;color:var(--text-secondary)">Enter your email and we'll send a reset link (if the account exists).</p>
+          <input type="email" id="forgot-email" placeholder="Email" required autocomplete="email">
+          <button type="submit" class="new-chat-btn" style="width:100%">Send reset link</button>
+          <p class="auth-switch"><a href="#" id="show-login-2">Back to sign in</a></p>
+        </form>
+
+        <p id="auth-message" class="auth-message"></p>
+      </div>
+    </div>
 
     <script src="script.js?v=20261024_clean_v6"></script>
 </body>

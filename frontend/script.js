@@ -52,10 +52,12 @@ let activePanel = 'chat-panel';
 function init() {
     loadSessions();
     loadTheme();
+    loadAuth();
     startNewSession();
     setupParticles();
     setupTextareaAutoResize();
     setupNavTabs();
+    setupAuthModal();
     checkBackendHealth();
     setInterval(checkBackendHealth, 30000);
 }
@@ -82,10 +84,91 @@ async function checkBackendHealth() {
 // Request helpers
 // ══════════════════════════════════════════════════════
 
+// ===== AUTH (Phase 2 frontend wiring) =====
+// Access token in localStorage (documented XSS tradeoff); refresh token lets
+// us recover silently when the access token expires after 15 minutes.
+const AUTH = {
+    access: null,
+    refresh: null,
+    user: null,
+};
+
+function loadAuth() {
+    AUTH.access = localStorage.getItem('auth_access');
+    AUTH.refresh = localStorage.getItem('auth_refresh');
+    const raw = localStorage.getItem('auth_user');
+    AUTH.user = raw ? JSON.parse(raw) : null;
+    updateAuthUi();
+}
+
+function saveAuth(access, refresh, user) {
+    AUTH.access = access; AUTH.refresh = refresh; AUTH.user = user;
+    localStorage.setItem('auth_access', access);
+    localStorage.setItem('auth_refresh', refresh);
+    localStorage.setItem('auth_user', JSON.stringify(user));
+    updateAuthUi();
+}
+
+function clearAuth() {
+    AUTH.access = AUTH.refresh = AUTH.user = null;
+    localStorage.removeItem('auth_access');
+    localStorage.removeItem('auth_refresh');
+    localStorage.removeItem('auth_user');
+    updateAuthUi();
+}
+
+function updateAuthUi() {
+    const label = document.getElementById('auth-label');
+    if (label) label.textContent = AUTH.access ? (AUTH.user?.full_name || 'Account') : 'Sign in';
+    loadQuota();
+}
+
+async function refreshAccessToken() {
+    if (!AUTH.refresh) return false;
+    try {
+        const resp = await fetch(API_URL + '/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: AUTH.refresh })
+        });
+        if (!resp.ok) { clearAuth(); return false; }
+        const data = await resp.json();
+        // Server rotates the refresh token on every refresh.
+        saveAuth(data.access_token, data.refresh_token, AUTH.user || {});
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function apiFetch(path, options = {}, retried = false) {
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if (AUTH.access) headers['Authorization'] = 'Bearer ' + AUTH.access;
+    const resp = await fetch(API_URL + path, Object.assign({}, options, { headers }));
+    if (resp.status === 401 && !retried && AUTH.refresh) {
+        if (await refreshAccessToken()) {
+            return apiFetch(path, options, true);
+        }
+    }
+    return resp;
+}
+
+async function loadQuota() {
+    if (!AUTH.access) return;
+    try {
+        const resp = await apiFetch('/auth/me');
+        if (!resp.ok) return;
+        const me = await resp.json();
+        AUTH.user = me; saveAuth(AUTH.access, AUTH.refresh, me);
+        const el = document.getElementById('quota-bar');
+        if (el) el.textContent = `Quota: ${me.quota_used}/${me.quota_limit} \u00b7 ${me.plan_code} plan`;
+    } catch { /* non-fatal */ }
+}
+
 function getAuthHeaders() {
-    return {
-        'Content-Type': 'application/json'
-    };
+    const h = { 'Content-Type': 'application/json' };
+    if (AUTH.access) h['Authorization'] = 'Bearer ' + AUTH.access;
+    return h;
 }
 
 function setupNavTabs() {
@@ -372,6 +455,14 @@ function formatBotResponse(data) {
         .replace(/\n/g, '<br>');
 
     html += `<div class="message-text"><p>${answerHtml}</p></div>`;
+
+    // Source chips (roadmap §4.4e): clickable citations for every answer.
+    if (Array.isArray(data.sources) && data.sources.length) {
+        html += '<div class="source-chips">' +
+            data.sources.map(s => `<span class="source-chip" title="Source">📚 ${escapeHtml(s)}</span>`).join('') +
+            '</div>';
+    }
+
     html += `<button class="msg-tts-btn" onclick="speakText(this)" data-text="${escapeHtml(data.answer)}">🔊 Read Aloud</button>`;
 
     return html;
@@ -408,13 +499,20 @@ window.submitChatMessage = async function(queryOverride) {
                 content: m.role === 'user' ? m.text : (m.html ? m.html.replace(/<[^>]*>/g, '').slice(0, 300) : '')
             }));
 
-        const resp = await fetch(API_URL + '/ask', {
+        const resp = await apiFetch('/ask', {
             method: 'POST',
-            headers: getAuthHeaders(),
             body: JSON.stringify({ query, chat_history: history, mode: currentMode })
         });
         removeTyping();
 
+        if (resp.status === 401) {
+            clearAuth();
+            throw Object.assign(new Error('Please sign in to continue.'), { authRequired: true });
+        }
+        if (resp.status === 429) {
+            const err = await resp.json().catch(() => ({}));
+            throw Object.assign(new Error(err.detail || 'Quota reached'), { quotaExhausted: true });
+        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
         const data = await resp.json();
@@ -432,8 +530,17 @@ window.submitChatMessage = async function(queryOverride) {
     } catch (err) {
         removeTyping();
         console.error('Chat error:', err);
-        appendMessage('system', `<div class="message-text"><p style="color:var(--danger)">⚠️ Could not reach the server. Please check if the backend is running.</p></div>`);
-        showToast('Connection failed. Retrying backend connection...', 'error');
+        let msg;
+        if (err.authRequired) {
+            msg = '🔒 Please <a href="#" onclick="openAuthModal();return false">sign in</a> to keep chatting.';
+            openAuthModal();
+        } else if (err.quotaExhausted) {
+            msg = '🚦 ' + escapeHtml(err.message);
+        } else {
+            msg = '⚠️ Could not reach the server. Please check if the backend is running.';
+        }
+        appendMessage('system', `<div class="message-text"><p style="color:var(--danger)">${msg}</p></div>`);
+        showToast(err.authRequired ? 'Sign in required' : 'Connection failed.', 'error');
     } finally {
         if (sendBtn) sendBtn.disabled = false;
         userInput.focus();
@@ -580,3 +687,120 @@ function showToast(message, type = 'info') {
 
 // ═══════════════════════════════════════════════════════
 init();
+
+// ===== AUTH MODAL WIRING (Phase 2 frontend) =====
+window.openAuthModal = function() {
+    document.getElementById('auth-modal-backdrop').style.display = 'flex';
+    showAuthForm('login');
+};
+
+function setupAuthModal() {
+    const backdrop = document.getElementById('auth-modal-backdrop');
+    const close = () => { backdrop.style.display = 'none'; setAuthMsg(''); };
+    document.getElementById('auth-btn').addEventListener('click', () => {
+        if (AUTH.access) {
+            if (confirm('Sign out?')) {
+                apiFetch('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token: AUTH.refresh }) })
+                    .finally(() => { clearAuth(); showToast('Signed out', 'info'); });
+            }
+        } else {
+            openAuthModal();
+        }
+    });
+    document.getElementById('auth-modal-close').addEventListener('click', close);
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+
+    const show = (id) => document.getElementById(id);
+    show('show-register').onclick = (e) => { e.preventDefault(); showAuthForm('register'); };
+    show('show-login').onclick = (e) => { e.preventDefault(); showAuthForm('login'); };
+    show('show-login-2').onclick = (e) => { e.preventDefault(); showAuthForm('login'); };
+    show('show-forgot').onclick = (e) => { e.preventDefault(); showAuthForm('forgot'); };
+
+    show('login-form').addEventListener('submit', onLogin);
+    show('register-form').addEventListener('submit', onRegister);
+    show('forgot-form').addEventListener('submit', onForgot);
+}
+
+function showAuthForm(which) {
+    document.getElementById('login-form').style.display = which === 'login' ? '' : 'none';
+    document.getElementById('register-form').style.display = which === 'register' ? '' : 'none';
+    document.getElementById('forgot-form').style.display = which === 'forgot' ? '' : 'none';
+    document.getElementById('auth-modal-title').textContent =
+        which === 'register' ? 'Create account' : which === 'forgot' ? 'Reset password' : 'Sign in';
+    setAuthMsg('');
+}
+
+function setAuthMsg(text, isError) {
+    const el = document.getElementById('auth-message');
+    el.textContent = text || '';
+    el.style.color = isError ? 'var(--danger, #ef4444)' : 'var(--success, #10b981)';
+}
+
+async function onLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    setAuthMsg('Signing in...');
+    try {
+        const resp = await fetch(API_URL + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) { setAuthMsg(data.detail || 'Invalid email or password', true); return; }
+        saveAuth(data.access_token, data.refresh_token, data.user || { email });
+        document.getElementById('auth-modal-backdrop').style.display = 'none';
+        showToast('Welcome back!', 'success');
+        loadQuota();
+    } catch {
+        setAuthMsg('Network error — is the backend running?', true);
+    }
+}
+
+async function onRegister(e) {
+    e.preventDefault();
+    const body = {
+        email: document.getElementById('register-email').value.trim(),
+        password: document.getElementById('register-password').value,
+        full_name: document.getElementById('register-name').value.trim()
+    };
+    setAuthMsg('Creating account...');
+    try {
+        const resp = await fetch(API_URL + '/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) { setAuthMsg(data.detail || 'Registration failed', true); return; }
+        setAuthMsg(data.message || 'Account created. Check your email to verify.');
+        // Auto-login if the backend issues tokens on register (dev path).
+        if (data.access_token) {
+            saveAuth(data.access_token, data.refresh_token, { email: body.email });
+            document.getElementById('auth-modal-backdrop').style.display = 'none';
+        } else {
+            showAuthForm('login');
+        }
+    } catch {
+        setAuthMsg('Network error — is the backend running?', true);
+    }
+}
+
+async function onForgot(e) {
+    e.preventDefault();
+    const email = document.getElementById('forgot-email').value.trim();
+    setAuthMsg('Sending...');
+    try {
+        const resp = await fetch(API_URL + '/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        // Always 200 by design — never leak which emails exist.
+        const data = await resp.json().catch(() => ({}));
+        setAuthMsg(data.message || 'If that email exists, a reset link was sent.');
+    } catch {
+        setAuthMsg('Network error — is the backend running?', true);
+    }
+}

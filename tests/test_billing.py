@@ -12,8 +12,6 @@ import uuid
 _tmpdb = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmpdb.name}"
 
-from datetime import timedelta  # noqa: E402
-
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.config import rate_limiter  # noqa: E402
