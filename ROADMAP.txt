@@ -23,7 +23,7 @@ HOW TO USE THIS ROADMAP
 PHASE 1: DATABASE + INFRASTRUCTURE FOUNDATION
              (PostgreSQL, Docker Compose, Alembic, pgvector)
 ================================================================================
-Estimated: 1-2 weeks | Priority: CRITICAL — everything else depends on this
+Estimated: 1-2 weeks | Priority: CRITICAL -- everything else depends on this
 
 --------------------------------------------------------------------------------
 1.1 GOAL
@@ -38,17 +38,17 @@ so the database evolves safely with the code.
 You asked: SQL or NoSQL? ANSWER: PostgreSQL. Here is the reasoning a senior
 engineer would give:
 
-  + ACID transactions — money (orders, subscriptions) MUST be exact. A
+  + ACID transactions -- money (orders, subscriptions) MUST be exact. A
     NoSQL database with eventual consistency can lose a payment record.
-  + Foreign keys & joins — user -> order -> plan -> quota relationships
+  + Foreign keys & joins -- user -> order -> plan -> quota relationships
     are natural in SQL. In MongoDB you'd model them manually.
-  + JSONB — PostgreSQL's JSONB columns give you document flexibility for
+  + JSONB -- PostgreSQL's JSONB columns give you document flexibility for
     chat messages and retrieved context. You do NOT need MongoDB.
-  + pgvector extension — stores AI embeddings for semantic search INSIDE
+  + pgvector extension -- stores AI embeddings for semantic search INSIDE
     Postgres. You do NOT need a separate vector DB (Qdrant/Pinecone) yet.
   + One system to learn, backup, and secure.
 
-  What you WILL add later (Phase 5): Redis — as a cache for identical
+  What you WILL add later (Phase 5): Redis -- as a cache for identical
   questions and rate-limit counters. That's the NoSQL piece you actually need.
 
 --------------------------------------------------------------------------------
@@ -81,13 +81,13 @@ STEP 4: Install Python dependencies for DB work:
   - sqlalchemy (ORM - the standard Python database toolkit)
   - alembic (schema migrations - "git for your database")
   - psycopg2-binary or psycopg[binary] (Postgres driver)
-  - asyncpg (if you use async SQLAlchemy — recommended for FastAPI)
+  - asyncpg (if you use async SQLAlchemy -- recommended for FastAPI)
 
 STEP 5: Set up the database layer:
   - app/core/database.py
       * Engine + SessionLocal + Base (sync) or async engine (async)
       * get_db() dependency that yields a session and closes it
-  - app/models/  (SQLAlchemy models — one file per domain)
+  - app/models/  (SQLAlchemy models -- one file per domain)
       * user.py         (users table)
       * conversation.py (conversations, messages)
       * knowledge.py    (knowledge_documents with pgvector column)
@@ -193,7 +193,7 @@ STEP 9: Update the RAG service to read from the DB instead of JSON files.
     id              UUID PK
     user_id         UUID FK -> users
     plan_id         UUID FK -> plans
-    amount          INTEGER  (in cents — never floats for money!)
+    amount          INTEGER  (in cents -- never floats for money!)
     currency        VARCHAR(3)
     provider        VARCHAR(20)
     provider_payment_id   VARCHAR(255)
@@ -217,9 +217,9 @@ STEP 9: Update the RAG service to read from the DB instead of JSON files.
     created_at      TIMESTAMPTZ
 
   INDEXES to create:
-    - users(email) — already unique
+    - users(email) -- already unique
     - messages(conversation_id, created_at)
-    - knowledge_documents(embedding) — pgvector ivfflat/hnsw index
+    - knowledge_documents(embedding) -- pgvector ivfflat/hnsw index
     - usage_events(user_id, created_at)
     - subscriptions(user_id, status)
 
@@ -281,7 +281,7 @@ Estimated: 1-2 weeks | Priority: CRITICAL
 2.1 GOAL
 --------------------------------------------------------------------------------
 A complete, production-grade login/signup system with proper token lifecycle,
-role-based access control, and brute-force protection — actually WIRED into
+role-based access control, and brute-force protection -- actually WIRED into
 the API (your previous auth module was dead code; this time it gets used).
 
 --------------------------------------------------------------------------------
@@ -328,15 +328,15 @@ the API (your previous auth module was dead code; this time it gets used).
   WHY TWO TOKENS? (this is the key interview question)
     - Access token leaks? It dies in 15 minutes. Damage limited.
     - Refresh token leak? Server can revoke it (it's in the DB).
-    - Stateless JWT access tokens mean no DB hit on every request — fast.
-    - Stateful refresh tokens mean revocable sessions — secure.
+    - Stateless JWT access tokens mean no DB hit on every request -- fast.
+    - Stateful refresh tokens mean revocable sessions -- secure.
 
 --------------------------------------------------------------------------------
 2.3 DETAILED STEPS
 --------------------------------------------------------------------------------
 
 STEP 1: Install: python-jose[cryptography], passlib[bcrypt], bcrypt==4.0.1
-        (pin bcrypt — passlib has compatibility issues with bcrypt>=4.1)
+        (pin bcrypt -- passlib has compatibility issues with bcrypt>=4.1)
 
 STEP 2: Password policy (app/core/security.py):
         - Minimum 10 characters
@@ -354,15 +354,15 @@ STEP 4: Endpoints (app/api/v1/endpoints/auth.py):
         POST /auth/refresh
         POST /auth/logout
         POST /auth/verify-email?token=...
-        POST /auth/forgot-password  (always return 200 — don't leak which
+        POST /auth/forgot-password  (always return 200 -- don't leak which
                                      emails exist)
         POST /auth/reset-password?token=...
         GET  /auth/me  (return current user profile)
 
 STEP 5: Dependencies (app/core/deps.py):
-        get_current_user  — hard requirement (401 if missing)
-        get_optional_user — used by /ask so guest usage is possible if you want
-        require_role("admin") — for admin-only endpoints
+        get_current_user  -- hard requirement (401 if missing)
+        get_optional_user -- used by /ask so guest usage is possible if you want
+        require_role("admin") -- for admin-only endpoints
 
 STEP 6: Email service (app/services/email.py):
         - Provider options (free tiers): Brevo, Resend, SendGrid
@@ -383,7 +383,7 @@ STEP 9: Audit logging: record login, failed login, password change to audit_log.
 
 STEP 10: FRONTEND changes:
         - Login/register modal (you deleted the old one; rebuild properly)
-        - Store access token in memory (NOT localStorage — XSS risk)
+        - Store access token in memory (NOT localStorage -- XSS risk)
         - Store refresh token in httpOnly cookie (needs backend cookie support)
           OR localStorage with the understanding of XSS tradeoff
         - Auto-refresh logic: if any request gets 401, try refresh, retry once
@@ -402,13 +402,13 @@ STEP 10: FRONTEND changes:
   [ ] CORS restricted to your frontend origins
   [ ] Security headers (X-Content-Type-Options, X-Frame-Options)
   [ ] HTTPS enforced in production (Render/Railway do this automatically)
-  [ ] SQL injection safe (SQLAlchemy ORM parameterizes — never f-strings in SQL)
+  [ ] SQL injection safe (SQLAlchemy ORM parameterizes -- never f-strings in SQL)
   [ ] Input validation everywhere (Pydantic)
 
 --------------------------------------------------------------------------------
 2.5 DEFINITION OF DONE
 --------------------------------------------------------------------------------
-  [ ] Can register, verify email, login, refresh, logout — full cycle
+  [ ] Can register, verify email, login, refresh, logout -- full cycle
   [ ] Access token expires after 15 min and refresh flow recovers silently
   [ ] 6th login attempt from same IP in 15 min gets 429
   [ ] /ask rejects unauthenticated requests with 401
@@ -433,11 +433,11 @@ webhooks. Quota enforcement is server-side.
 --------------------------------------------------------------------------------
 3.2 THE THREE GOLDEN RULES
 --------------------------------------------------------------------------------
-  1. NEVER store card numbers — the provider (Stripe/Razorpay) handles them
+  1. NEVER store card numbers -- the provider (Stripe/Razorpay) handles them
      on their hosted page. You never see them. PCI compliance is theirs.
-  2. NEVER trust the frontend for pricing — the server defines plan prices
+  2. NEVER trust the frontend for pricing -- the server defines plan prices
      from config; the frontend just shows buttons.
-  3. WEBHOOKS ARE THE SOURCE OF TRUTH — activate a subscription ONLY when the
+  3. WEBHOOKS ARE THE SOURCE OF TRUTH -- activate a subscription ONLY when the
      provider's webhook arrives (with a verified signature), never from a
      frontend redirect (which can be faked).
 
@@ -447,7 +447,7 @@ webhooks. Quota enforcement is server-side.
   Stripe        -> best docs, global, excellent test mode, use this if your
                    audience is international
   Razorpay      -> best for India (UPI, RuPay, local cards)
-  Paddle/LemonSqueezy -> "merchant of record" — they handle global tax/VAT
+  Paddle/LemonSqueezy -> "merchant of record" -- they handle global tax/VAT
                          for you (worth it if selling worldwide and you don't
                          want to deal with tax compliance)
 
@@ -470,7 +470,7 @@ webhooks. Quota enforcement is server-side.
   6. STRIPE SENDS WEBHOOK to your server: POST /billing/webhooks/stripe
   7. Server:
        - VERIFIES SIGNATURE (critical! prevents forged requests)
-       - Checks event hasn't been processed before (idempotency — Stripe can
+       - Checks event hasn't been processed before (idempotency -- Stripe can
          send the same event twice)
        - Updates subscriptions table: status=active, period dates
        - Records the order as paid
@@ -497,7 +497,7 @@ webhooks. Quota enforcement is server-side.
   │          │              │ admin dashboard, usage analytics    │
   └──────────┴──────────────┴─────────────────────────────────────┘
 
-  Implement annual pricing later (2 months free) — adds complexity, do monthly
+  Implement annual pricing later (2 months free) -- adds complexity, do monthly
   first.
 
 --------------------------------------------------------------------------------
@@ -523,9 +523,9 @@ STEP 4: app/services/billing.py:
         - handle_webhook(payload, signature) -> process event
 STEP 5: Endpoints (app/api/v1/endpoints/billing.py):
         POST /billing/checkout
-        POST /billing/webhooks/stripe     (NO AUTH — signature verifies it)
+        POST /billing/webhooks/stripe     (NO AUTH -- signature verifies it)
         GET  /billing/subscription        (current plan + usage)
-        POST /billing/portal              (Stripe customer portal — lets users
+        POST /billing/portal              (Stripe customer portal -- lets users
                                            manage cards/cancel without you
                                            building that UI)
 STEP 6: Webhook endpoint config:
@@ -562,7 +562,7 @@ STEP 9: Test with Stripe test card 4242 4242 4242 4242 (always succeeds),
 PHASE 4: LUNG CANCER KNOWLEDGE BASE + HYBRID RAG
              (From Generic to Deep Clinical Specialization)
 ================================================================================
-Estimated: 2-3 weeks | Priority: HIGH — this is the product's core value
+Estimated: 2-3 weeks | Priority: HIGH -- this is the product's core value
 
 --------------------------------------------------------------------------------
 4.1 GOAL
@@ -573,7 +573,7 @@ hybrid search. This is where the chatbot stops being a demo and becomes
 genuinely useful.
 
 --------------------------------------------------------------------------------
-4.2 KNOWLEDGE BASE — WRITE THE CORPUS FIRST
+4.2 KNOWLEDGE BASE -- WRITE THE CORPUS FIRST
 --------------------------------------------------------------------------------
 Structure every article with: title, content, category, cancer_type='lung',
 source (citation), difficulty (patient|professional).
@@ -599,7 +599,7 @@ Categories to cover (target: 80-150 articles):
        hoarseness, unexplained weight loss, bone pain
      - Imaging: chest X-ray -> CT -> PET-CT (what each shows)
      - Tissue sampling: bronchoscopy, EBUS-TBNA, CT-guided biopsy,
-       thoracoscopy/VATS — what to expect, risks
+       thoracoscopy/VATS -- what to expect, risks
      - Molecular testing (NGS): what genes get tested and why
      - PD-L1 testing
 
@@ -620,7 +620,7 @@ Categories to cover (target: 80-150 articles):
      - Resistance mechanisms: what happens when treatment stops working
 
   F. IMMUNOTHERAPY
-     - How checkpoint inhibitors work (PD-1/PD-L1) — in plain language
+     - How checkpoint inhibitors work (PD-1/PD-L1) -- in plain language
      - Pembrolizumab, atezolizumab, nivolumab, durvalumab
      - Chemo-immunotherapy combinations
      - Durvalumab consolidation after chemoradiation (stage III)
@@ -634,13 +634,13 @@ Categories to cover (target: 80-150 articles):
 
   H. SIDE EFFECTS & SUPPORTIVE CARE
      - Immunotherapy irAEs: colitis, pneumonitis, thyroiditis, hepatitis
-     - Febrile neutropenia — EMERGENCY (RED triage)
+     - Febrile neutropenia -- EMERGENCY (RED triage)
      - Chemotherapy: nausea, fatigue, neuropathy, hair loss
      - Targeted therapy: rash, diarrhea, interstitial lung disease
      - Radiation esophagitis
 
   I. PARANEOPLASTIC SYNDROMES
-     - SVC syndrome — EMERGENCY
+     - SVC syndrome -- EMERGENCY
      - Lambert-Eaton, SIADH, hypercalcemia
 
   J. SUPPORTIVE & LIFESTYLE
@@ -663,7 +663,7 @@ match "imaging results").
 
 Upgrade to HYBRID:
   1. Dense/semantic: embed each article with SentenceTransformers
-     all-MiniLM-L6-v2 (free, runs locally, 384 dims — matches your schema)
+     all-MiniLM-L6-v2 (free, runs locally, 384 dims -- matches your schema)
      - Store embeddings in knowledge_documents.embedding (pgvector)
      - Query: embed the question, cosine similarity search
   2. Sparse/keyword: TF-IDF or BM25 (keep what you have)
@@ -690,7 +690,7 @@ Upgrade to HYBRID:
 
   b. CONVERSATION MEMORY:
      - Store last 6 turns in the messages table
-     - Pass to LLM as context (you already pass chat_history — now persist it)
+     - Pass to LLM as context (you already pass chat_history -- now persist it)
      - Add follow-up understanding: "What about stage 3?" after a stage
        question should resolve "stage 3" to the same topic.
 
@@ -704,7 +704,7 @@ Upgrade to HYBRID:
        oncologist." Do NOT let the LLM freestyle on medical topics.
 
   e. CITE SOURCES:
-     - Return the article titles used (you already do this — render them in
+     - Return the article titles used (you already do this -- render them in
        the frontend as clickable chips)
 
   f. STREAMING (optional, big UX win):
@@ -730,7 +730,7 @@ Upgrade to HYBRID:
 PHASE 5: MLOPS, DEPLOYMENT & OBSERVABILITY
              (CI/CD, Containers, Monitoring, Backups)
 ================================================================================
-Estimated: 1-2 weeks | Priority: HIGH — without this, the product is not real
+Estimated: 1-2 weeks | Priority: HIGH -- without this, the product is not real
 
 --------------------------------------------------------------------------------
 5.1 GOAL
@@ -786,7 +786,7 @@ a demo from a product.
 --------------------------------------------------------------------------------
 5.5 OBSERVABILITY
 --------------------------------------------------------------------------------
-  a. Structured JSON logging (you have logging_config.py — extend it to JSON
+  a. Structured JSON logging (you have logging_config.py -- extend it to JSON
      output in production, human-readable in dev)
 
   b. Sentry (free tier, sentry.io):
@@ -796,13 +796,13 @@ a demo from a product.
 
   c. Metrics to track (Grafana/Render dashboard later):
      - Request rate, error rate, latency p50/p95/p99
-     - LLM token spend per day (you log usage_events — aggregate them)
+     - LLM token spend per day (you log usage_events -- aggregate them)
      - Active subscriptions count
      - Query success rate (answer quality proxy: did retrieval find context?)
 
   d. Health checks:
-     - /health (liveness — is the process up?)
-     - /health/ready (readiness — can it reach the DB, Redis, LLM provider?)
+     - /health (liveness -- is the process up?)
+     - /health/ready (readiness -- can it reach the DB, Redis, LLM provider?)
 
   e. Uptime monitoring: UptimeRobot (free) or Render's built-in
 
@@ -811,7 +811,7 @@ a demo from a product.
 --------------------------------------------------------------------------------
   - Render paid Postgres: automated daily backups + point-in-time recovery
   - Self-managed: nightly pg_dump cron to S3
-  - TEST YOUR RESTORE — a backup you've never restored is not a backup.
+  - TEST YOUR RESTORE -- a backup you've never restored is not a backup.
 
 --------------------------------------------------------------------------------
 5.7 DEPLOYMENT TARGETS (PICK ONE)
@@ -839,7 +839,7 @@ a demo from a product.
 PHASE 6: LUNG CANCER DETECTION WITH DEEP LEARNING
              (Chest CT -> Nodule Detection & Classification Microservice)
 ================================================================================
-Estimated: 4-6 weeks | Priority: ADVANCED — only after Phases 1-5 are solid
+Estimated: 4-6 weeks | Priority: ADVANCED -- only after Phases 1-5 are solid
 
 --------------------------------------------------------------------------------
 6.1 GOAL
@@ -856,7 +856,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
 --------------------------------------------------------------------------------
 6.2 WHY A SEPARATE MICROSERVICE
 --------------------------------------------------------------------------------
-  - Different runtime: needs GPU, PyTorch, huge model weights — don't slow
+  - Different runtime: needs GPU, PyTorch, huge model weights -- don't slow
     down your API container
   - Different scaling: inference load != chat load
   - Different deploy cycle: you'll retrain models often
@@ -885,9 +885,12 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
 
 --------------------------------------------------------------------------------
 6.4 MODEL ARCHITECTURE (RECOMMENDED LEARNING PATH)
+    *** SUPERSEDED: see "PHASE 6 (REVISED)" section below (6.R.1) for the    ***
+    *** current ViT + multimodal plan matched to your hardware. The ladder   ***
+    *** below is kept as background learning material only.                  ***
 --------------------------------------------------------------------------------
 
-  LEVEL 1 (start here — 2D classification):
+  LEVEL 1 (start here -- 2D classification):
     - Take CT slices containing nodules (crop around annotated nodules)
     - Fine-tune a pretrained 2D CNN: ResNet-50 or DenseNet-121
     - Binary classification: nodule vs no nodule (or benign vs suspicious)
@@ -895,15 +898,15 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
       validation, inference
     - Metrics: accuracy, AUC, sensitivity, specificity
 
-  LEVEL 2 (3D — real clinical quality):
+  LEVEL 2 (3D -- real clinical quality):
     - 3D CNN (3D ResNet / 3D DenseNet) on nodule crops (e.g., 32x32x32)
-    - Uses volumetric context — significantly better performance
+    - Uses volumetric context -- significantly better performance
     - Use PyTorch with 3D convolutions
 
-  LEVEL 3 (full detection — the real product):
+  LEVEL 3 (full detection -- the real product):
     - Object detection on full CT volumes
     - Options: RetinaNet-3D, YOLOv5-3D adaptations, or MONAI's detection API
-    - MONAI (Medical Open Network for AI) — PyTorch-based framework
+    - MONAI (Medical Open Network for AI) -- PyTorch-based framework
       purpose-built for medical imaging. USE IT. It handles DICOM parsing,
       3D transforms, sliding-window inference, and has pretrained models.
 
@@ -914,7 +917,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
 --------------------------------------------------------------------------------
 6.5 DATA PIPELINE (THE MOST IMPORTANT PART)
 --------------------------------------------------------------------------------
-  1. DICOM parsing: pydicom to read CT scans (HU values — Hounsfield Units)
+  1. DICOM parsing: pydicom to read CT scans (HU values -- Hounsfield Units)
   2. Preprocessing:
      - Normalize HU (window: lung window, e.g., -1000 to 400 HU)
      - Resample to consistent voxel spacing (e.g., 1x1x1 mm)
@@ -925,7 +928,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
      - BE CAREFUL: augmentation must respect medical reality (don't flip
        laterality markers)
   5. Train/val/test split: SPLIT BY PATIENT, never by slice (otherwise
-     slices from the same scan leak between sets — you'll get fake metrics)
+     slices from the same scan leak between sets -- you'll get fake metrics)
 
   THIS IS THE #1 BEGINNER MISTAKE: splitting by slice instead of by patient.
   Your model will look 99% accurate and be useless in reality.
@@ -934,12 +937,12 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
 6.6 TRAINING SETUP
 --------------------------------------------------------------------------------
   - GPU required: options
-      a) Google Colab free tier (T4 GPU) — start here
+      a) Google Colab free tier (T4 GPU) -- start here
       b) Kaggle Notebooks (free GPU hours)
       c) Cloud: Lambda Labs / RunPod / Vast.ai (cheap per-hour)
   - Framework: PyTorch + MONAI
   - Experiment tracking: Weights & Biases (free tier) or MLflow
-    (log every run: hyperparams, metrics, loss curves — non-negotiable for
+    (log every run: hyperparams, metrics, loss curves -- non-negotiable for
      a real ML project)
   - Hyperparameters to start:
       optimizer: AdamW, lr 1e-4, weight decay 1e-5
@@ -949,7 +952,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
 --------------------------------------------------------------------------------
 6.7 VALIDATION & METRICS (REPORT THESE HONESTLY)
 --------------------------------------------------------------------------------
-  - Sensitivity (recall): % of true cancers detected — MOST important
+  - Sensitivity (recall): % of true cancers detected -- MOST important
     (a missed cancer is worse than a false alarm)
   - Specificity: % of true negatives correctly identified
   - AUC-ROC: overall discriminative ability
@@ -972,7 +975,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
       }
   - Model versioning: save with MLflow/W&B, load specific version at startup
   - Latency: batch inference, consider ONNX export or TorchScript for speed
-  - GPU serving: Colab won't work for production — use RunPod/Replicate/
+  - GPU serving: Colab won't work for production -- use RunPod/Replicate/
     Hugging Face Inference Endpoints for GPU hosting
 
 --------------------------------------------------------------------------------
@@ -985,7 +988,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
 
   The chatbot (already grounded in your Phase 4 knowledge base) explains the
   finding, what follow-up imaging is standard, and which questions to ask the
-  doctor. THIS integration — AI detection + AI explanation — is what makes
+  doctor. THIS integration -- AI detection + AI explanation -- is what makes
   your product unique.
 
 --------------------------------------------------------------------------------
@@ -995,7 +998,7 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
     device under FDA/EU MDR rules. You cannot ship that as a consumer app.
   - Safe positioning:
       * "Educational/research demonstration only"
-      * "Not a medical diagnosis — consult a radiologist"
+      * "Not a medical diagnosis -- consult a radiologist"
       * Synthetic or publicly-available (LUNA16) scans only, no real patient
         PHI without a compliance framework
   - If you ever want to go clinical: that's FDA 510(k) clearance territory,
@@ -1013,6 +1016,235 @@ A separate microservice that takes a chest CT scan (or a slice/series) and:
   [ ] Every response carries the research-only disclaimer
   [ ] Model card documenting: training data, metrics, limitations
 
+
+================================================================================
+PHASE 6 (REVISED): LUNG CANCER DETECTION + MULTIMODAL VISION
+             (ViT Nodule Classifier + Vision-LLM Report Bridge -- PREMIUM PLAN)
+================================================================================
+
+UPDATE NOTE (supersedes the generic CNN ladder above for planning purposes).
+Hardware reality: no NVIDIA GPU locally. Laptop = Ryzen 5 7530U (6C/12T),
+16 GB RAM, AMD Radeon iGPU. Strategy: TRAIN on free cloud GPUs (Colab/Kaggle),
+SERVE on CPU via ONNX, use HOSTED vision-LLM APIs for multimodal features.
+
+--------------------------------------------------------------------------------
+6.R.1 THE MODEL LANDSCAPE -- WHAT EXISTS AND WHAT TO PICK (BE SPECIFIC)
+--------------------------------------------------------------------------------
+
+  +------------------------+---------------------------+----------------------+
+  | FAMILY                 | CANDIDATE MODELS          | ROLE IN PRODUCT      |
+  +------------------------+---------------------------+----------------------+
+  | Vision Transformer     | ViT-S/16 (DeiT-Small),    | Nodule malignancy    |
+  | (classification)       | ViT-B/16, MedViT          | risk scorer          |
+  |                        | (medmnist.com), RETFound  |                      |
+  +------------------------+---------------------------+----------------------+
+  | Detection (find the    | RetinaNet-3D (MONAI),     | Locate nodules in    |
+  | nodule first)          | YOLOv5-3D                 | full CT volumes      |
+  +------------------------+---------------------------+----------------------+
+  | Self-supervised CXR    | Rad-DINO (HF: microsoft/  | Feature backbone for |
+  | encoders               | rad-dino), BioViL, ELIXR  | reports + similarity |
+  +------------------------+---------------------------+----------------------+
+  | Medical CLIP-style     | BiomedCLIP (HF: microsoft | Zero-shot image      |
+  | (image-text alignment) | /BiomedCLIP-PubMedBERT_   | tagging: "is this a  |
+  |                        | 256-vit_base_patch16_224" | chest X-ray?",       |
+  |                        | ~860 MB, CPU-friendly     | modality routing     |
+  +------------------------+---------------------------+----------------------+
+  | Radiology report       | MAIRA-2 (Microsoft, HF    | X-ray -> findings    |
+  | generation (VL LLM)    | "microsoft/maira-2",      | text; grounded       |
+  |                        | 7B/13B, CUDA-only)        | boxes optional       |
+  +------------------------+---------------------------+----------------------+
+  | Lightweight VLM        | CXRG-SVLM (RAD-DINO +     | CPU-viable report    |
+  | (small, quantized)     | 4-bit Qwen2.5-3B QLoRA,   | generation           |
+  |                        | ~2B params)               |                      |
+  +------------------------+---------------------------+----------------------+
+  | Hosted vision APIs     | NVIDIA NIM (key in hand), | Fastest premium      |
+  | (no GPU needed)        | Groq llama-3.2-11b-vision,| path; per-call cost, |
+  |                        | OpenAI GPT-4o(-mini)      | no hosting           |
+  +------------------------+---------------------------+----------------------+
+  | Diffusion (synthetic   | Stable Diffusion +        | OPTIONAL: synthetic  |
+  | data / augmentation)   | ControlNet; MAISI (NVIDIA | nodule augmentation  |
+  |                        | medical image gen)        | only; NOT product    |
+  +------------------------+---------------------------+----------------------+
+
+  WHY NOT BLIP / BLIP-2 for this product:
+  - BLIP-2 is general-purpose; medical domain fit is weak vs BiomedCLIP /
+    MAIRA-2. Use BiomedCLIP for retrieval/tagging; use MAIRA-2 or a hosted
+    vision LLM for description. Skip BLIP entirely (dead-end complexity).
+
+  WHY NOT DETR (family) as the primary detector:
+  - Published work (MELBA 2025, "Understanding differences in applying DETR
+    to natural and medical images") shows DETR underperforms on small,
+    sparse objects like nodules without heavy tuning. MONAI RetinaNet-3D
+    has mature lung-nodule recipes (detection_example on monai.io).
+
+  THE PICK (opinionated, matched to your hardware + time):
+  +--------------------------------------------------------------------------+
+  | PRIMARY PREMIUM STACK                                                    |
+  | 1. BiomedCLIP         -> upload triage + modality check (CPU, fast)      |
+  | 2. Hosted vision LLM  -> descriptive finding report (NVIDIA NIM or       |
+  |                          Groq vision; zero local compute)                |
+  | 3. ViT-S/16 finetuned -> nodule malignancy score on LUNA16 crops         |
+  |                          (train on Colab T4; serve as ONNX on CPU)       |
+  | 4. Existing RAG        -> grounds every finding in Fleischner/NCCN       |
+  |                          guidelines; cites sources (Phase 4 reuse)       |
+  | SECONDARY (optional, later)                                              |
+  | 5. MAIRA-2 or CXRG-SVLM -> self-hosted report gen (needs GPU server:     |
+  |                          RunPod/Replicate; defer until revenue)          |
+  | 6. MONAI RetinaNet-3D  -> full-volume detection (later)                  |
+  +--------------------------------------------------------------------------+
+
+  REFERENCES (read these; they are the technical backbone):
+  - MAIRA-2: arxiv.org/abs/2406.04449 -- grounded CXR report generation;
+    HF: huggingface.co/microsoft/maira-2 (7B/13B, CUDA required)
+  - BiomedCLIP: arxiv.org/abs/2303.00915 -- 15M biomedical image-text pairs;
+    HF: microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224
+  - ViT foundation: "An Image is Worth 16x16 Words" -- arxiv.org/abs/2010.11929
+  - RETFound (retinal foundation model, transferable Med ViT recipe):
+    nature.com/articles/s41586-023-06555-y
+  - MedMNIST MedViT benchmarks: medmnist.com
+  - MONAI detection tutorial: monai.io + github.com/Project-MONAI/tutorials
+  - LUNA16 benchmark: luna16.grand-challenge.org (NDET + FPRED tracks)
+  - CXRG-SVLM (small VLM, 4-bit QLoRA + RAD-DINO, CPU/1-GPU feasible):
+    nature.com/articles/s41598-026-77203-3
+  - ELIXR (X-ray aligned LLM, zero-shot AUC 0.85): arxiv.org/abs/2308.01317
+
+--------------------------------------------------------------------------------
+6.R.2 THREE-STAGE BUILD (each stage ships value on its own)
+--------------------------------------------------------------------------------
+
+  STAGE A -- HOSTED MULTIMODAL (1-2 weeks, ZERO GPU) <-- START HERE
+    Ship first: image upload + hosted vision model + RAG explanation.
+
+    STEP A1: New dependency: none beyond current stack (HTTP calls).
+    STEP A2: app/services/vision.py -- provider-abstracted like email.py:
+      - NIMVisionProvider (NVIDIA NIM, key already in .env)
+      - GroqVisionProvider (llama-3.2-11b-vision, key already in .env)
+      - OpenAIVisionProvider (optional)
+      Interface: analyze_image(image_bytes, mime, question) -> {findings,
+        confidence_note, disclaimer}
+    STEP A3: Endpoint: POST /vision/analyze (Pro plan gate via quota
+      service; add new plan code "vision" or extend Pro entitlements):
+      - Accept multipart upload (PNG/JPEG, max 10 MB, magic-byte check)
+      - Rate limit: 10 images/day per user (Redis counter)
+      - Store: uploads table (id, user_id, storage_key, sha256, created_at)
+        -> S3/local disk; NEVER trust client filename
+    STEP A4: Pre-check with BiomedCLIP (CPU, ~200 ms): is this actually a
+      chest X-ray/CT? If not -> 415 with friendly message. This one check
+      saves you from garbage-in garbage-out and API spend.
+    STEP A5: Prompt template (vision LLM) -- DESCRIBE ONLY, NEVER DIAGNOSE:
+      "You are assisting a lung-health education platform. Describe ONLY
+       what is visibly present in this chest image using neutral anatomical
+       and density language. Do NOT provide a diagnosis, treatment, or
+       urgency. Output JSON: {visible_structures:[], notable_densities:[],
+       technical_quality_note:'', uncertainty:''}. If image is low quality
+       or non-chest, say so."
+    STEP A6: Bridge to chatbot (the magic moment): feed returned JSON +
+      image metadata into build_prompt() with retrieved Fleischner/NCCN
+      guideline articles (Phase 4 RAG). The user's chat answers WHY a
+      finding matters and what follow-up guidelines suggest -- cited.
+    STEP A7: Frontend: upload button in chat input bar; drag-and-drop;
+      image preview; "Analyzing..." state; render findings + source chips
+      (reuse existing chip UI).
+    STEP A8: Billing tie-in: log usage_event endpoint='/vision/analyze';
+      Pro/vision plan gates; free tier gets 2 images/month as a taste.
+
+    DEFINITION OF DONE (Stage A):
+    [ ] POST /vision/analyze rejects non-chest images (BiomedCLIP gate)
+    [ ] Returns structured JSON + disclaimers; stores upload; rate-limited
+    [ ] Chat answer cites guideline sources alongside the image findings
+    [ ] Works on 512 MB+ hosting (no local model load) -- the Render lesson
+    [ ] pytest: mocked vision provider, gate rejects junk, quota enforcement
+
+  STAGE B -- ViT NODULE CLASSIFIER (3-4 weeks, GPU only during training)
+    Data: LUNA16 subset. Only the FPRED track is needed (classification),
+    not full detection -- much easier, still credible.
+
+    STEP B1: Download LUNA16 (registration-free mirrors exist; official via
+      luna16.grand-challenge.org). ~120 GB raw; you only need annotations
+      CSV + a subset (start with 200-400 scans).
+    STEP B2: Preprocess ON YOUR LAPTOP (CPU-friendly, no GPU needed):
+      - pydicom/MHD reading (SimpleITK) -> HU window [-1000, 400]
+      - Extract 64x64x3 crops around each annotated nodule center
+        (3 adjacent slices as channels = pseudo-3D for a 2D ViT)
+      - Negative crops sampled randomly (1:3 positive:negative ratio)
+      - SPLIT BY PATIENT (SeriesInstanceUID), never by crop -- #1 mistake
+      - Save as npz shards to data/luna16_crops/ (~2-4 GB total)
+    STEP B3: Train on Colab/Kaggle free T4:
+      - Model: ViT-S/16 (timm 'vit_small_patch16_224.augreg_in21k')
+        OR medmnist-pretrained MedViT; OR Rad-DINO backbone + linear head
+      - Fine-tune recipe: AdamW lr 1e-4 (backbone 1e-5), cosine schedule,
+        20-30 epochs, batch 64, mixed precision, early stop on val AUC
+      - Augmentation: flips, rotation +/-15 deg, intensity jitter -- NO
+        laterality-breaking transforms (roadmap §6.5)
+      - Track every run in W&B (free) -- non-negotiable
+      - Target metrics: AUC > 0.85 on held-out patient-level test split
+        (realistic for FPRED-style task; publish exact numbers in model card)
+    STEP B4: Export: torch.onnx.export -> ONNX opset 17, dynamic batch.
+      Quantize: onnxruntime.quantization quantize_dynamic -> INT8
+      (~4x smaller, ~2-3x faster on CPU; verify AUC drop < 0.01)
+    STEP B5: Serving (app/services/detect.py):
+      - onnxruntime.InferenceSession, CPU EP, 1 thread per worker
+      - Input: crop path -> np.float32 -> session.run
+      - Output: {malignancy_probability, model_version, disclaimer}
+      - Latency budget: <150 ms/crop on your Ryzen (measure, log p50/p95)
+    STEP B6: Endpoint: POST /detect/nodule (multipart, 1-3 slices or crop):
+      - Reuse Stage A upload storage + BiomedCLIP gate
+      - Return findings + Fleischner size-based follow-up recommendation
+        (pure Phase 4 RAG, no model needed for the guideline part)
+    STEP B7: Model card (MODEL_CARD.md): data source, split strategy,
+      metrics (AUC/sens/spec + FROC-lite), limitations, intended use,
+      "research/educational only" positioning (roadmap §6.10).
+
+    DEFINITION OF DONE (Stage B):
+    [ ] LUNA16 crops preprocessed, split BY PATIENT, npz shards verified
+    [ ] ViT trained on Colab, W&B logs every run, val AUC > 0.85
+    [ ] ONNX INT8 model served by /detect/nodule, <150 ms/crop locally
+    [ ] Quantization AUC delta documented (< 0.01)
+    [ ] Model card in repo; every response carries the disclaimer
+    [ ] Integration: nodule score -> chatbot explanation with citations
+
+  STAGE C -- SELF-HOSTED REPORT GENERATION (defer; 2-3 weeks, needs GPU rental)
+    Only if Stage A/B revenue or users demand deeper analysis.
+    - Option 1: MAIRA-2 7B on a RunPod/Replicate A10G (~$0.60-1.10/hr)
+      -> serverless endpoint wrapping HF inference
+    - Option 2 (cheaper, CPU-viable): CXRG-SVLM recipe -- RAD-DINO encoder
+      + 4-bit Qwen2.5-3B QLoRA; runs ~5 s/report on 1 GPU, borderline CPU
+    - Option 3: skip self-hosting forever; hosted APIs are 95% as good at
+      1/100th the ops cost. Honest recommendation: keep Stage A forever.
+
+--------------------------------------------------------------------------------
+6.R.3 PREMIUM PLAN TIERS (UPDATED -- replaces §3.5 table for Phase 6)
+--------------------------------------------------------------------------------
+  Free   -> text chat only (20 queries/mo) -- unchanged
+  Pro    -> unlimited chat + clinical mode + 2 image analyses/mo
+  Vision ($19/mo) -> everything in Pro + 30 image analyses/mo + nodule
+                     scorer + priority vision queue + report export (PDF)
+  Clinic ($49/mo) -> everything in Vision + 5 seats + admin dashboard
+
+  Implementation: extend plans.features JSONB + quota_service endpoints
+  (already supports endpoint-keyed quotas via usage_events).
+
+--------------------------------------------------------------------------------
+6.R.4 SCHEDULE (matches Appendix B, replaces "Week 14-19: Phase 6")
+--------------------------------------------------------------------------------
+  Week 14-15: Stage A (hosted multimodal) -- SHIPS FIRST, no GPU needed
+  Week 16-17: Stage B preprocessing + Colab training
+  Week 18-19: Stage B ONNX serving + frontend + model card
+  Week 20+:   Stage C evaluation (probably skip) + iteration
+
+--------------------------------------------------------------------------------
+6.R.5 COST / FEASIBILITY SUMMARY
+--------------------------------------------------------------------------------
+  Training:      $0 (Colab free T4 / Kaggle 30h/wk GPU)
+  Inference:     $0 extra (ONNX on existing CPU; ViT-S ~22M params,
+                 ~40-80 ms/crop on Ryzen 5 7530U -- verified hardware class)
+  BiomedCLIP:    ~860 MB RAM CPU load -- fine alongside the 400 MB API
+                 after the embeddings-precompute optimization
+  Vision API:    NVIDIA NIM free credits then ~$0.001-0.01/image;
+                 Groq vision free tier is generous for dev
+  Storage:       uploads on S3 standard, lifecycle to IA after 90 days
+  Verdict:       whole premium vision tier is viable on 16 GB CPU laptop
+                 + free cloud GPUs + hosted APIs. No GPU purchase needed.
 
 ================================================================================
 PHASE 7: POLISH, LAUNCH & BUSINESS LAYER
@@ -1051,7 +1283,7 @@ pages, and a launch plan.
 7.4 LEGAL PAGES (NON-NEGOTIABLE)
 --------------------------------------------------------------------------------
   - Terms of Service
-  - Privacy Policy (GDPR/CCPA compliant — data deletion on request,
+  - Privacy Policy (GDPR/CCPA compliant -- data deletion on request,
     data retention policy)
   - Medical Disclaimer (prominent, on every answer, in the footer)
   - Cookie notice
@@ -1061,7 +1293,7 @@ pages, and a launch plan.
 --------------------------------------------------------------------------------
 7.5 LAUNCH CHECKLIST
 --------------------------------------------------------------------------------
-  [ ] Load testing (locust or k6) — know your limits
+  [ ] Load testing (locust or k6) -- know your limits
   [ ] Rate limiting on ALL public endpoints
   [ ] Security review: OWASP top 10 checklist passed
   [ ] LLM prompt-injection testing (can users make the bot ignore safety?)
@@ -1085,7 +1317,7 @@ APPENDIX A: FULL LEARNING RESOURCES
 ================================================================================
 
   PostgreSQL:        postgresql.org/docs, use "pgexercises.com" for practice
-  SQLAlchemy 2.0:    docs.sqlalchemy.org (2.0 style — async)
+  SQLAlchemy 2.0:    docs.sqlalchemy.org (2.0 style -- async)
   Alembic:           alembic.sqlalchemy.org
   FastAPI:           fastapi.tiangolo.com (best docs in Python)
   JWT:               jwt.io + OWASP Authentication Cheat Sheet
@@ -1107,14 +1339,14 @@ APPENDIX A: FULL LEARNING RESOURCES
 APPENDIX B: WEEK-BY-WEEK SUGGESTED SCHEDULE (PART-TIME, ~10-15h/week)
 ================================================================================
 
-  Week  1-2:  Phase 1 — Docker Compose + Postgres + Alembic + models
-  Week  3-4:  Phase 2 — Auth system complete + frontend login UI
-  Week  5-6:  Phase 3 — Stripe integration + webhooks + quotas
-  Week  7-9:  Phase 4 — Lung cancer corpus + hybrid RAG + chatbot upgrades
-  Week 10-11: Phase 5 — CI/CD + Sentry + monitoring + backups
-  Week 12-13: Phase 7 — Admin dashboard + legal + analytics
+  Week  1-2:  Phase 1 -- Docker Compose + Postgres + Alembic + models
+  Week  3-4:  Phase 2 -- Auth system complete + frontend login UI
+  Week  5-6:  Phase 3 -- Stripe integration + webhooks + quotas
+  Week  7-9:  Phase 4 -- Lung cancer corpus + hybrid RAG + chatbot upgrades
+  Week 10-11: Phase 5 -- CI/CD + Sentry + monitoring + backups
+  Week 12-13: Phase 7 -- Admin dashboard + legal + analytics
               LAUNCH BETA
-  Week 14-19: Phase 6 — DL detection (parallel to running product)
+  Week 14-19: Phase 6 -- DL detection (parallel to running product)
   Week 20+:   Iteration based on user feedback
 
 ================================================================================
@@ -1157,28 +1389,28 @@ APPENDIX C: REPOSITORY FINAL TARGET STRUCTURE
    Print this. Check off items. Build in order. Do not skip phases.
 ================================================================================
 
-Phase 1 — Database & Infrastructure ✅ (currently ~90%) → steps to 100%
+Phase 1 -- Database & Infrastructure ✅ (currently ~90%) → steps to 100%
 ✅ docker-compose.yml with pgvector/pg16 + Redis + api, healthchecks, named volume
-✅ Alembic migrations (3 — schema, billing events, auth email actions)
+✅ Alembic migrations (3 -- schema, billing events, auth email actions)
 ✅ Full model layer: User, BillingEvent, KnowledgeDoc, triage
 ✅ Tests for models and migrations
 Remaining steps:
 
-Verify seeding of the JSON KB (lung-cancer articles) — kb_stats reads from JSON files in settings.KB_PATH; confirm each file exists and reports counts, and that DB rows are populated
+Verify seeding of the JSON KB (lung-cancer articles) -- kb_stats reads from JSON files in settings.KB_PATH; confirm each file exists and reports counts, and that DB rows are populated
 Confirm the API GET /health returns DB + Redis status
-Add a one-shot seeding script (already present as seed_kb in app/services — confirm it runs end-to-end)
+Add a one-shot seeding script (already present as seed_kb in app/services -- confirm it runs end-to-end)
 Verify Docker api service restarts cleanly after a full docker compose down -v && up
-Phase 2 — API, RAG Orchestrator & Triage ✅ (currently ~85%) → steps to 100%
+Phase 2 -- API, RAG Orchestrator & Triage ✅ (currently ~85%) → steps to 100%
 ✅ Multi-agent RAG orchestrator (fallback agents, KB agent, triage)
 ✅ CORS + fallback model config for production
 ✅ Global loginAsDemo demo agent
 Remaining steps:
 
-Complete API endpoint coverage — especially POST /chat and POST /triage, with model fallback for Groq/OpenAI production keys
-Verify POST /chat includes KB retrieval + safety filtering (already partially implemented — confirm end-to-end behavior)
+Complete API endpoint coverage -- especially POST /chat and POST /triage, with model fallback for Groq/OpenAI production keys
+Verify POST /chat includes KB retrieval + safety filtering (already partially implemented -- confirm end-to-end behavior)
 Confirm triage rules (red flag detection, follow-up instructions) are enforced in the response
 Add missing API tests for RAG fallback and triage responses
-Phase 3 — Auth ✅ (currently ~80%) → steps to 100%
+Phase 3 -- Auth ✅ (currently ~80%) → steps to 100%
 ✅ JWT-based User auth with loginAsDemo global fallback
 ✅ CORS fixed for production
 ✅ Demo password handling + global loginAsDemo agent
@@ -1188,7 +1420,7 @@ Finish the auth tests suite (currently partially passing)
 Complete the User model test coverage (billing events, triage)
 Ensure auth tests cover the global loginAsDemo fallback end-to-end
 Verify all auth tests pass after the latest model/fallback changes
-Phase 4 — Frontend ✅ (currently ~75%) → steps to 100%
+Phase 4 -- Frontend ✅ (currently ~75%) → steps to 100%
 ✅ Onboarding blocker removed; direct chat without login
 ✅ UI cleanup and test suite trimmed to passing tests
 Remaining steps:
@@ -1196,14 +1428,14 @@ Remaining steps:
 Complete the frontend chat flow end-to-end (already partially done)
 Ensure protected endpoints still behave correctly for logged-in Users while the onboarding blocker stays removed
 Add tests for the direct-chat flow and protected-endpoint fallback behavior
-Phase 5 — CI/CD & Production ✅ (currently ~70%) → steps to 100%
+Phase 5 -- CI/CD & Production ✅ (currently ~70%) → steps to 100%
 ✅ GitHub Actions workflow (flake8 + pytest)
 ✅ Multi-agent RAG + multi-model fallback for production
 ✅ Docker + Render deployment pipeline (partially implemented)
 Remaining steps:
 
-Complete the production deployment workflow — Groq/OpenAI fallback keys, Render deploy, CORS config for production
+Complete the production deployment workflow -- Groq/OpenAI fallback keys, Render deploy, CORS config for production
 Finish the production RAG fallback tests and multi-agent fallback behavior
 Verify Docker production build passes the full flake8 + pytest suite
 Ensure CORS and production model fallback are enforced end-to-end in the latest code
-Overall status: Phases 1–5 are built but not yet at 100% (~80% overall). Finishing the steps above — especially the remaining auth tests, production RAG fallback, and deployment workflow — gets Phases 1–5 to full 100%.
+Overall status: Phases 1–5 are built but not yet at 100% (~80% overall). Finishing the steps above -- especially the remaining auth tests, production RAG fallback, and deployment workflow -- gets Phases 1–5 to full 100%.
