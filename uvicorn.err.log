@@ -1,0 +1,30 @@
+Redis unavailable for rate limiting (Timeout connecting to server); in-memory
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|##########| 103/103 [00:00<00:00, 4253.31it/s]
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO:     Started server process [7860]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8010 (Press CTRL+C to quit)
+--- Logging error ---
+Traceback (most recent call last):
+  File "D:\CFRBACKUP-WZITMJTO\anaconda3\Lib\logging\__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "D:\CFRBACKUP-WZITMJTO\anaconda3\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 61: character maps to <undefined>
+Call stack:
+  File "D:\CFRBACKUP-WZITMJTO\anaconda3\Lib\threading.py", line 1032, in _bootstrap
+    self._bootstrap_inner()
+  File "D:\CFRBACKUP-WZITMJTO\anaconda3\Lib\threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "D:\CFRBACKUP-WZITMJTO\anaconda3\Lib\site-packages\anyio\_backends\_asyncio.py", line 1124, in run
+    result = context.run(func, *args)
+  File "C:\Users\User\Desktop\best_resume_maker\cancer-awareness-and-healthcare-chatbot\app\api\v1\endpoints\auth.py", line 124, in register
+    send_template_email(user.email, "verify_email", verify_token)
+  File "C:\Users\User\Desktop\best_resume_maker\cancer-awareness-and-healthcare-chatbot\app\services\email.py", line 69, in send_template_email
+    get_email_provider().send(to=to, subject=subject, body=body)
+  File "C:\Users\User\Desktop\best_resume_maker\cancer-awareness-and-healthcare-chatbot\app\services\email.py", line 44, in send
+    logger.info("[EMAIL \u2192 %s] %s\n%s", to, subject, body)
+Message: '[EMAIL \u2192 %s] %s\n%s'
+Arguments: ('smoketest_phase5@example.com', 'Verify your Cancer Awareness Chatbot account', 'Welcome to Cancer Awareness Chatbot!\n\nPlease verify your email address by opening this link (valid 24h):\nhttp://localhost:8000/auth/verify-email?token=GV6ofLDgJamTfYjAZU26BZGVok8kCsNWBZKJ-2Ydx2Y\n\nIf you did not create an account, you can ignore this email.')

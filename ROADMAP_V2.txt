@@ -1,0 +1,263 @@
+================================================================================
+    CANCER AWARENESS CHATBOT PLATFORM -- REVISED BUILD ROADMAP (v2)
+          Phases 1-5 COMPLETE & VERIFIED (47/47 tests, deployed on Render+Vercel)
+          Phase 6 = CNN + ViT Cross-Matching Engine (SIMPLIFIED, no BS)
+          Phase 7 = Launch Polish (LEAN, no enterprise cosplay)
+================================================================================
+
+STATUS SUMMARY (verified 2026-11-10, no-Docker mode)
+--------------------------------------------------------------------------------
+  Phase 1  Database & models .............. DONE  (SQLite fallback verified;
+                                             Docker/pgvector optional upgrade)
+  Phase 2  Auth (JWT, RBAC, rate limit) ... DONE  (14/14 tests, live smoke test)
+  Phase 3  Billing & quotas ............... DONE  (10/10 tests; Stripe keys =
+                                             only remaining manual step)
+  Phase 4  Lung KB + hybrid RAG ........... DONE  (12/12 tests; EGFR/screening
+                                             retrieval + grounding gate pass)
+  Phase 5  CI/CD, Docker, observability ... DONE  (flake8 clean, ci.yml green,
+                                             /health + /health/ready verified)
+  DEPLOYED: backend on Render, frontend on Vercel. 47/47 pytest passing.
+
+DO NOT touch Phases 1-5 anymore except bug fixes. Everything below is new work.
+
+================================================================================
+PHASE 6: MULTIMODAL VISION -- CNN + ViT CROSS-MATCHING ENGINE
+================================================================================
+Philosophy: SIMPLE. Two small models that AGREE or DISAGREE, bridged by the
+chatbot you already have. No 3D pipelines. No MAIRA-2. No self-hosted LLMs.
+No 120 GB downloads. The "hardcore engineering" is the cross-validation
+logic, not model zoo cosplay.
+
+6.1 THE CORE IDEA -- SILK-SMOOTH CROSS MATCHING
+--------------------------------------------------------------------------------
+Two independent models look at the same lung image crop:
+
+  MODEL 1 (CNN):  DenseNet-121 (2D, torchvision pretrained, ~30 MB)
+                  -- why CNN: spatial texture features, cheap, battle-tested
+                     in medical imaging, tiny, runs anywhere.
+  MODEL 2 (ViT):  ViT-S/16 (timm 'vit_small_patch16_224', ~22 MB)
+                  -- why ViT: global attention catches shape/context the
+                     CNN's local kernels miss. Different inductive bias =
+                     genuinely independent second opinion.
+
+  Both are fine-tuned on the SAME LUNA16 crops (Stage B prep below).
+
+  CROSS-MATCHING RULES (the actual product logic):
+    a. Both agree malignant-ish  (avg p >= 0.7, |p_cnn - p_vit| <= 0.2)
+         -> verdict "suspicious", confidence HIGH
+    b. Both agree benign-ish     (avg p <= 0.3, |p_cnn - p_vit| <= 0.2)
+         -> verdict "likely benign", confidence HIGH
+    c. Disagreement (|p_cnn - p_vit| > 0.2)
+         -> verdict "inconclusive -- models disagree", confidence LOW,
+            ALWAYS escalate to "show this to a radiologist"
+    d. Borderline zone (0.3 < avg p < 0.7)
+         -> verdict "indeterminate", recommend follow-up imaging per
+            Fleischner (pulled from Phase 4 RAG, cited)
+
+  This agreement/disagreement pattern IS the sellable engineering story:
+  "ensemble cross-validation of heterogeneous architectures (CNN vs ViT)"
+  -- great resume line, trivial to implement, honest to users.
+
+6.2 STAGE A -- MULTIMODAL UPLOAD FIRST (1 week, ZERO GPU, zero training)
+--------------------------------------------------------------------------------
+Ship this BEFORE any model training. It works on Render's free tier TODAY.
+
+  A1. app/services/vision.py -- provider-abstracted like email.py:
+        - GroqVisionProvider  (llama-3.2-11b-vision; key already in .env)
+        - NIMVisionProvider   (NVIDIA NIM; key already in .env)
+        - analyze_image(image_bytes, mime, question)
+              -> {findings, confidence_note, disclaimer}
+  A2. POST /vision/analyze endpoint:
+        - multipart upload, PNG/JPEG only, max 10 MB, magic-byte check
+        - rate limit 10 images/day/user (Redis or in-memory fallback --
+          you already have ResilientRateLimiter, just reuse it)
+        - uploads table: id, user_id, storage_key, sha256, created_at
+        - NEVER trust client filename; store by sha256
+  A3. Prompt = DESCRIBE ONLY, NEVER DIAGNOSE:
+        "Describe ONLY what is visibly present in this chest image using
+         neutral anatomical and density language. No diagnosis, no
+         treatment, no urgency. Output JSON: {visible_structures: [],
+         notable_densities: [], technical_quality_note: '', uncertainty: ''}.
+         If low quality or non-chest, say so."
+  A4. Cheap modality gate (NO BiomedCLIP download needed for Stage A):
+        - Heuristic first: file size, image dims, grayscale-ish check
+        - Then ask the vision LLM itself: "Is this a chest radiograph or
+          chest CT? Answer yes/no only." -> reject non-chest with 415
+        - Optional upgrade LATER: BiomedCLIP zero-shot gate (~860 MB RAM,
+          only if free-tier RAM allows after the embedding precompute)
+  A5. Bridge to chat: findings JSON -> build_prompt() with Phase 4 RAG
+      context (Fleischner/NCCN articles). Chat answers "why does this
+      matter + what follow-up do guidelines suggest" WITH citations.
+  A6. Frontend: upload button in chat bar, drag-and-drop, preview,
+      "Analyzing...", render findings + reuse existing source chips.
+  A7. Billing: log usage_event endpoint='/vision/analyze'. Free tier:
+      2 images/mo. Pro: 10/mo. Vision: 30/mo (see 6.5).
+
+  STAGE A DEFINITION OF DONE:
+    [ ] POST /vision/analyze rejects non-chest images
+    [ ] Structured JSON + disclaimer returned; upload stored; rate-limited
+    [ ] Chat answer cites guideline sources alongside image findings
+    [ ] Runs in <=512 MB RAM hosting (no local model load)
+    [ ] pytest: mocked vision provider, junk rejection, quota enforcement
+
+6.3 STAGE B -- DATA PREP FOR BOTH MODELS (1 week, CPU-only, laptop-friendly)
+--------------------------------------------------------------------------------
+One preprocessing pass feeds BOTH networks. Keep it small on purpose.
+
+  B1. Data: LUNA16 SUBSET ONLY -- annotations CSV + 150-300 scans.
+      (Full set is ~120 GB; you need maybe 8-12 GB. Crop-and-throw-away.)
+  B2. Preprocess on laptop (SimpleITK, CPU, hours not days):
+        - Read MHD/DICOM -> HU window [-1000, 400]
+        - 64x64x3 crops around each annotated nodule center
+          (3 adjacent slices as channels = pseudo-3D, feeds 2D models)
+        - Negative crops randomly sampled, 1:3 positive:negative
+        - SAVE AS PNGs in data/luna16_crops/{pos,neg}/ -- simpler than
+          npz, viewable, dataloader-trivial
+        - SPLIT BY PATIENT (SeriesInstanceUID), NEVER by crop.
+          The #1 fake-metrics mistake. 70/15/15 train/val/test.
+  B3. scripts/prep_luna16.py -- idempotent, logs crop counts per split.
+
+  DONE WHEN: crop folders populated, split list committed as CSV,
+  counts printed and sanity-checked.
+
+6.4 STAGE C -- TRAIN BOTH MODELS ON COLAB (1 weekend + iteration)
+--------------------------------------------------------------------------------
+Train in the SAME Colab notebook run, back-to-back, same data, same splits.
+Track both in one Weights & Biases project.
+
+  Shared recipe (both models):
+        - AdamW, lr 1e-4 head / 1e-5 backbone, cosine schedule
+        - 20-30 epochs, batch 64, mixed precision, early stop on val AUC
+        - Augmentation: horizontal flip OK, rotation +/-15 deg, intensity
+          jitter. NO vertical flip (breaks anatomy), NO heavy color aug.
+        - class weights for 1:3 imbalance; report AUC not accuracy
+
+  CNN:      timm 'densenet121' (or torchvision densenet121), new head = 1
+  ViT:      timm 'vit_small_patch16_224.augreg_in21k', new head = 1
+
+  Target: BOTH models AUC > 0.85 on the held-out patient-level test split.
+  If the CNN hits 0.87 and ViT hits 0.86 -- PERFECT. Similar-but-not-identical
+  is exactly what makes cross-matching meaningful.
+
+  DONE WHEN: two checkpoints downloaded locally, W&B runs logged,
+  test AUC documented for each in MODEL_CARD.md.
+
+6.5 STAGE D -- CROSS-MATCHING ENGINE + SERVING (1-2 weeks, pure CPU)
+--------------------------------------------------------------------------------
+This is the "hardcore engineering" part and it is 100% local CPU work.
+
+  D1. Export both models to ONNX (opset 17):
+        torch.onnx.export -> onnxruntime.quantization quantize_dynamic INT8
+        -> app/models_store/densenet121_int8.onnx (~8 MB)
+        -> app/models_store/vits16_int8.onnx     (~9 MB)
+        Verify AUC drop from quantization < 0.01 for each.
+
+  D2. app/services/crossmatch.py -- THE ENGINE:
+        class CrossMatchEngine:
+            - loads both ONNX sessions at startup (single-thread, CPU EP)
+            - predict(crop_np) -> {"cnn_p": float, "vit_p": float,
+                                   "verdict": str, "confidence": str,
+                                   "delta": float, "disclaimer": str}
+            - implements rules a-d from 6.1 verbatim
+            - logs p50/p95 latency per model
+
+  D3. POST /detect/nodule endpoint:
+        - reuse Stage A upload storage + modality gate
+        - accept 1-3 CT slices (PNG/JPEG/short NPY), run preprocessing
+          inline (same HU window + 64x64x3 as training -- import the
+          SAME function from a shared module, never re-implement)
+        - response: cross-match verdict + Fleischner follow-up text from
+          Phase 4 RAG + disclaimer, every time.
+
+  D4. MODEL_CARD.md: data source, split strategy, per-model AUC/sens/spec,
+      cross-match confusion behavior, limitations, intended use,
+      "research/educational only" positioning.
+
+  D5. Optional polish (only if time remains): simple Grad-CAM overlay
+      from the CNN branch for the frontend -- one afternoon, big demo WOW.
+
+  STAGE D DEFINITION OF DONE:
+    [ ] Both ONNX INT8 models served, quantization AUC delta < 0.01
+    [ ] Cross-match verdicts match rules a-d exactly (unit-tested with
+        synthetic probability pairs -- no GPU needed for these tests)
+    [ ] /detect/nodule < 300 ms total on your Ryzen, logged p50/p95
+    [ ] Model card in repo; disclaimer on every response
+    [ ] Integration: verdict -> chatbot explanation with citations
+    [ ] pytest: mocked ONNX sessions for CI (no model files in repo LFS hell;
+        keep real weights out of git, load from env-configured path)
+
+6.6 PLAN TIERS (FINAL)
+--------------------------------------------------------------------------------
+  Free   -> text chat only (20 queries/mo)
+  Pro    ($9/mo)  -> unlimited chat + clinical mode + 10 image analyses/mo
+  Vision ($19/mo) -> 30 image analyses/mo + nodule cross-match scorer
+                     + report export (PDF)
+  Clinic ($49/mo) -> everything in Vision + 5 seats + admin dashboard
+
+  Implementation: plans.features JSONB + endpoint-keyed quotas in
+  quota_service (already exists -- just add '/vision/analyze' and
+  '/detect/nodule' keys).
+
+6.7 WHAT WE DELIBERATELY DO NOT BUILD (the "removed asshole things")
+--------------------------------------------------------------------------------
+  x 3D CNNs / MONAI RetinaNet-3D full-volume detection   (months, huge data)
+  x MAIRA-2 self-hosted report generation                (GPU rental ops hell)
+  x CXRG-SVLM custom VLM training                        (research rabbit hole)
+  x BLIP/BLIP-2 anything                                 (wrong domain fit)
+  x BiomedCLIP as a REQUIRED gate in Stage A             (optional later; the
+                                                          LLM self-check is
+                                                          free and sufficient)
+  x Diffusion/synthetic nodule augmentation              (scope creep)
+  x FROC full benchmark reporting                        (AUC + sens/spec is
+                                                          honest enough)
+  x Separate detection microservice                      (same FastAPI app,
+                                                          lazy-loaded models,
+                                                          one deploy, less pain)
+
+================================================================================
+PHASE 7: LAUNCH POLISH (LEAN -- 1-2 weeks, only what moves users)
+================================================================================
+
+7.1 MINIMUM ADMIN (SQLAdmin, one afternoon -- do NOT hand-roll dashboards)
+--------------------------------------------------------------------------------
+  - /admin (require_role("admin")): user list, deactivate, grant plan,
+    view audit log, view usage_events counts. That's it.
+
+7.2 ANALYTICS (three SQL queries, not a platform)
+--------------------------------------------------------------------------------
+  - Top 20 questions (from usage/messages)      -> drives KB content
+  - Retrieval miss rate                          -> drives KB quality
+  - Triage RED events per week                   -> safety monitoring
+  Skip PostHog/Grafana until >100 real users.
+
+7.3 LEGAL (a weekend, templates first)
+--------------------------------------------------------------------------------
+  - Privacy Policy + Terms (generator/Iubenda template, then skim)
+  - Medical disclaimer already in every API response (Phase 1-5 done);
+    also put it in the site footer
+  - "Research/educational tool. Not a medical device." on every vision page.
+
+7.4 LAUNCH CHECKLIST (SHORT VERSION)
+--------------------------------------------------------------------------------
+  [ ] k6 smoke: 50 concurrent /ask for 5 min -- know your breaking point
+  [ ] Rate limits confirmed on ALL public endpoints (auth + ask + vision)
+  [ ] Prompt-injection spot check: 10 adversarial prompts cannot bypass
+      the safety guardrail
+  [ ] Sentry clean for a week on staging
+  [ ] 10 beta users recruited; watch 3 of them use it live
+  [ ] Demo video: chat -> image upload -> cross-match verdict -> cited
+      Fleischner follow-up. This 60-second clip is your resume portfolio.
+
+================================================================================
+APPENDIX: UPDATED SCHEDULE
+--------------------------------------------------------------------------------
+  Week  1:  Phase 6 Stage A (multimodal upload + hosted vision + RAG bridge)
+  Week  2:  Stage A frontend + billing tie-in + tests           [SHIP v2]
+  Week  3:  Stage B LUNA16 subset download + crop prep (CPU)
+  Week  4:  Stage C train CNN + ViT on Colab (one weekend)
+  Week  5:  Stage D ONNX export + cross-match engine + endpoint [SHIP v3]
+  Week  6:  Phase 7 admin + legal + launch                       [LAUNCH]
+
+================================================================================
+END OF ROADMAP v2 -- Phases 1-5 locked. Build Stage A this week. Keep it silk.
+================================================================================
